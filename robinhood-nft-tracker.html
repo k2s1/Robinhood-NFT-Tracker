@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MINT TAPE — Robinhood Chain Live NFT Feed</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0c0e;
+    --panel:#12161a;
+    --panel-2:#181d22;
+    --line:#242b31;
+    --amber:#ffb020;
+    --amber-dim:#8a6418;
+    --teal:#3ddc97;
+    --red:#ff5c5c;
+    --text:#e7ebee;
+    --muted:#7d8891;
+    --muted-2:#525d66;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;height:100%;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+  a{color:var(--amber);text-decoration:none;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  .display{font-family:'Barlow Condensed',sans-serif;letter-spacing:0.02em;}
+
+  /* ---------- TICKER ---------- */
+  #ticker-wrap{
+    background:#000; border-bottom:1px solid var(--line); overflow:hidden; height:34px;
+    display:flex; align-items:center; white-space:nowrap; position:relative;
+  }
+  #ticker-track{display:inline-flex; align-items:center; animation:scrollTicker 40s linear infinite; padding-left:100%;}
+  #ticker-wrap:hover #ticker-track{animation-play-state:paused;}
+  @keyframes scrollTicker{ from{transform:translateX(0);} to{transform:translateX(-100%);} }
+  .tick-item{display:inline-flex; align-items:center; gap:6px; padding:0 18px; font-size:12.5px; font-family:'JetBrains Mono',monospace; border-right:1px solid #1c2126;}
+  .tick-item .sym{color:var(--amber); font-weight:600;}
+  .tick-item .up{color:var(--teal);}
+  .tick-item .down{color:var(--red);}
+
+  /* ---------- HEADER ---------- */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 20px; border-bottom:1px solid var(--line); background:var(--panel);
+    flex-wrap:wrap; gap:10px;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand .mark{
+    width:30px;height:30px;border:1.5px solid var(--amber);border-radius:3px;
+    display:flex;align-items:center;justify-content:center;color:var(--amber);
+    font-family:'Barlow Condensed'; font-weight:700; font-size:16px;
+  }
+  .brand h1{font-family:'Barlow Condensed'; font-weight:700; font-size:22px; margin:0; letter-spacing:0.03em;}
+  .brand h1 span{color:var(--amber);}
+  .brand .sub{font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:1px;}
+
+  .status-row{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .pill{
+    display:flex; align-items:center; gap:6px; font-size:11.5px; font-family:'JetBrains Mono',monospace;
+    padding:5px 10px; border:1px solid var(--line); border-radius:20px; color:var(--muted); background:var(--panel-2);
+  }
+  .dot{width:7px;height:7px;border-radius:50%; background:var(--muted-2);}
+  .dot.live{background:var(--teal); box-shadow:0 0 6px var(--teal); animation:pulse 1.4s ease-in-out infinite;}
+  .dot.err{background:var(--red); box-shadow:0 0 6px var(--red);}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  button, .btn{
+    background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:6px;
+    padding:7px 12px; font-size:12.5px; cursor:pointer; font-family:'Inter'; transition:border-color .15s;
+  }
+  button:hover, .btn:hover{border-color:var(--amber);}
+  button.primary{background:var(--amber); color:#1a1200; border-color:var(--amber); font-weight:600;}
+  button.primary:hover{background:#ffc450;}
+  button:disabled{opacity:.4; cursor:not-allowed;}
+  input, select{
+    background:#0c0f12; border:1px solid var(--line); color:var(--text); border-radius:6px;
+    padding:7px 10px; font-size:12.5px; font-family:'JetBrains Mono',monospace;
+  }
+  input:focus, select:focus{outline:none; border-color:var(--amber);}
+
+  /* ---------- STAT STRIP ---------- */
+  #stats{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  .stat{background:var(--panel); padding:10px 14px;}
+  .stat .lbl{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; font-family:'JetBrains Mono',monospace;}
+  .stat .val{font-family:'Barlow Condensed'; font-size:22px; font-weight:600; margin-top:2px;}
+  .stat .val.amber{color:var(--amber);}
+  .stat .val.teal{color:var(--teal);}
+
+  /* ---------- LAYOUT ---------- */
+  #app{display:grid; grid-template-columns:1fr 320px; gap:0; height:calc(100vh - 34px - 66px - 62px);}
+  @media (max-width:980px){ #app{grid-template-columns:1fr;} #sidebar{order:2;} }
+
+  #main{display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--line);}
+  #controls{
+    display:flex; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line);
+    background:var(--panel); flex-wrap:wrap; align-items:center;
+  }
+  #controls input[type=text]{flex:1; min-width:180px;}
+  .chip{
+    padding:5px 11px; border:1px solid var(--line); border-radius:20px; font-size:11.5px; cursor:pointer;
+    color:var(--muted); background:var(--panel-2); white-space:nowrap; font-family:'JetBrains Mono',monospace;
+  }
+  .chip.active{border-color:var(--amber); color:var(--amber);}
+  #chipbar{display:flex; gap:6px; padding:8px 14px; overflow-x:auto; border-bottom:1px solid var(--line); background:var(--panel);}
+
+  /* ---------- FEED (trade-tape style) ---------- */
+  #feed-head{
+    display:grid; grid-template-columns: 90px 1.3fr 90px 90px 110px 130px 60px 90px;
+    gap:8px; padding:7px 14px; font-size:10px; color:var(--muted-2); text-transform:uppercase;
+    letter-spacing:.05em; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace;
+  }
+  #feed{flex:1; overflow-y:auto; background:#0d1012;}
+  .row{
+    display:grid; grid-template-columns: 90px 1.3fr 90px 90px 110px 130px 60px 90px;
+    gap:8px; padding:9px 14px; border-bottom:1px solid #171c20; font-size:12.5px; align-items:center;
+    cursor:pointer; animation:flashin .6s ease-out;
+  }
+  .row:hover{background:#12171b;}
+  @keyframes flashin{ from{background:rgba(255,176,32,.14);} to{background:transparent;} }
+  .row .t{color:var(--muted-2); font-family:'JetBrains Mono',monospace; font-size:11px;}
+  .row .coll{display:flex; align-items:center; gap:8px; min-width:0;}
+  .row .thumb{width:26px;height:26px;border-radius:4px; background:#20262c; flex:none; object-fit:cover;}
+  .row .cname{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600;}
+  .row .std{font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;}
+  .row .price{font-family:'JetBrains Mono',monospace; color:var(--teal);}
+  .row .price.free{color:var(--muted);}
+  .row .qty{font-family:'JetBrains Mono',monospace;}
+  .row .who{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .row .risklbl{font-size:10px; font-family:'JetBrains Mono',monospace; padding:2px 7px; border-radius:3px; text-align:center;}
+  .risk-low{color:var(--teal); border:1px solid var(--teal);}
+  .risk-med{color:var(--amber); border:1px solid var(--amber);}
+  .risk-high{color:#ff9d5c; border:1px solid #ff9d5c;}
+  .risk-danger{color:var(--red); border:1px solid var(--red);}
+  .row .blk{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);}
+
+  #empty{padding:60px 20px; text-align:center; color:var(--muted);}
+  #empty b{color:var(--text); display:block; font-family:'Barlow Condensed'; font-size:20px; margin-bottom:6px;}
+
+  /* ---------- SIDEBAR ---------- */
+  #sidebar{display:flex; flex-direction:column; overflow-y:auto; background:var(--panel);}
+  .side-sec{border-bottom:1px solid var(--line); padding:14px;}
+  .side-sec h3{font-family:'Barlow Condensed'; font-size:14px; text-transform:uppercase; letter-spacing:.05em; margin:0 0 10px; color:var(--muted);}
+  .trend-row{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px dashed #1e2429; font-size:12.5px;}
+  .trend-row:last-child{border-bottom:none;}
+  .trend-rank{color:var(--amber); font-family:'JetBrains Mono',monospace; width:18px; flex:none;}
+  .trend-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .trend-vel{font-family:'JetBrains Mono',monospace; color:var(--teal); font-size:11px;}
+
+  .netgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11.5px;}
+  .netgrid div{background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px;}
+  .netgrid .l{color:var(--muted); font-size:10px; text-transform:uppercase; font-family:'JetBrains Mono',monospace;}
+  .netgrid .v{font-family:'JetBrains Mono',monospace; font-size:14px; margin-top:2px;}
+
+  textarea{width:100%; background:#0c0f12; border:1px solid var(--line); color:var(--text); border-radius:6px; padding:8px; font-family:'JetBrains Mono',monospace; font-size:11.5px;}
+  label.small{font-size:11px; color:var(--muted); display:block; margin:8px 0 4px;}
+  .row-inline{display:flex; gap:6px; align-items:center; margin-top:6px;}
+  .toggle-line{display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:6px 0;}
+  .switch{position:relative; width:34px; height:18px; background:#242b31; border-radius:20px; cursor:pointer; flex:none;}
+  .switch.on{background:var(--amber);}
+  .switch .knob{position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:left .15s;}
+  .switch.on .knob{left:18px;}
+
+  /* ---------- MODAL ---------- */
+  #overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center;
+    z-index:50; backdrop-filter:blur(2px);
+  }
+  #overlay.show{display:flex;}
+  #modal{
+    width:min(640px,92vw); max-height:86vh; overflow-y:auto; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:22px;
+  }
+  #modal h2{font-family:'Barlow Condensed'; font-size:26px; margin:0 0 4px;}
+  #modal .modal-close{float:right; cursor:pointer; color:var(--muted); font-size:20px;}
+  .kv{display:grid; grid-template-columns:140px 1fr; gap:6px 10px; font-size:12.5px; margin-top:14px;}
+  .kv .k{color:var(--muted); font-family:'JetBrains Mono',monospace; font-size:11px; text-transform:uppercase;}
+  .kv .v{font-family:'JetBrains Mono',monospace; word-break:break-all;}
+  .risk-box{margin-top:16px; padding:12px; border-radius:8px; border:1px solid var(--line); background:var(--panel-2);}
+  .risk-box h4{margin:0 0 8px; font-family:'Barlow Condensed'; font-size:16px;}
+  .risk-flags{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;}
+  .flag{font-size:10.5px; font-family:'JetBrains Mono',monospace; padding:3px 8px; border-radius:4px; background:#1c2227; color:var(--muted);}
+  .flag.bad{color:var(--red);}
+  .flag.warn{color:var(--amber);}
+  .flag.ok{color:var(--teal);}
+
+  footer{
+    padding:8px 16px; border-top:1px solid var(--line); background:var(--panel); font-size:11px; color:var(--muted-2);
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-family:'JetBrains Mono',monospace;
+  }
+  #toast-wrap{position:fixed; bottom:16px; right:16px; z-index:60; display:flex; flex-direction:column; gap:8px;}
+  .toast{background:var(--panel-2); border:1px solid var(--amber); border-radius:8px; padding:10px 14px; font-size:12.5px; max-width:280px; animation:flashin .4s;}
+</style>
+</head>
+<body>
+
+<div id="ticker-wrap"><div id="ticker-track"></div></div>
+
+<header>
+  <div class="brand">
+    <div class="mark">RH</div>
+    <div>
+      <h1>MINT<span>TAPE</span></h1>
+      <div class="sub">Robinhood Chain · live NFT mint intelligence</div>
+    </div>
+  </div>
+  <div class="status-row">
+    <div class="pill"><span class="dot" id="conn-dot"></span><span id="conn-label">connecting…</span></div>
+    <div class="pill">block <span class="mono" id="blk-label" style="color:var(--text); margin-left:4px;">—</span></div>
+    <button id="btn-settings">⚙ Settings</button>
+    <button id="btn-wallet">Wallet Lookup</button>
+    <button class="primary" id="btn-pause">Pause Feed</button>
+  </div>
+</header>
+
+<div id="stats">
+  <div class="stat"><div class="lbl">Block Height</div><div class="val amber" id="s-block">—</div></div>
+  <div class="stat"><div class="lbl">Mints Tracked</div><div class="val" id="s-mints">0</div></div>
+  <div class="stat"><div class="lbl">New Collections</div><div class="val" id="s-newcoll">0</div></div>
+  <div class="stat"><div class="lbl">Active Wallets</div><div class="val" id="s-wallets">0</div></div>
+  <div class="stat"><div class="lbl">Free Mints</div><div class="val teal" id="s-free">0</div></div>
+  <div class="stat"><div class="lbl">Paid Mints</div><div class="val" id="s-paid">0</div></div>
+  <div class="stat"><div class="lbl">Mints / Min</div><div class="val amber" id="s-velocity">0</div></div>
+</div>
+
+<div id="app">
+  <div id="main">
+    <div id="controls">
+      <input type="text" id="search" placeholder="search collection, contract, wallet, or tx hash…">
+      <select id="sort-select">
+        <option value="time">Newest first</option>
+        <option value="qty">Highest quantity</option>
+        <option value="price">Highest price</option>
+        <option value="gas">Highest gas</option>
+      </select>
+      <button id="btn-export-csv">Export CSV</button>
+      <button id="btn-export-json">Export JSON</button>
+    </div>
+    <div id="chipbar">
+      <div class="chip active" data-filter="all">All</div>
+      <div class="chip" data-filter="live">Live now</div>
+      <div class="chip" data-filter="free">Free mint</div>
+      <div class="chip" data-filter="paid">Paid mint</div>
+      <div class="chip" data-filter="erc721">ERC-721</div>
+      <div class="chip" data-filter="erc1155">ERC-1155</div>
+      <div class="chip" data-filter="new">New collections</div>
+      <div class="chip" data-filter="verified">Verified</div>
+      <div class="chip" data-filter="danger">High risk</div>
+    </div>
+    <div id="feed-head">
+      <div>Time</div><div>Collection</div><div>Std</div><div>Qty</div><div>Price</div><div>Wallet</div><div>Risk</div><div>Block</div>
+    </div>
+    <div id="feed">
+      <div id="empty"><b>Listening for mints…</b>Waiting for the first Transfer-from-zero event on Robinhood Chain. This can take a moment on the public rate-limited endpoint — add your own RPC key in Settings for lower latency.</div>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <div class="side-sec">
+      <h3>Trending Collections</h3>
+      <div id="trending"><div style="color:var(--muted); font-size:12px;">Nothing trending yet.</div></div>
+    </div>
+    <div class="side-sec">
+      <h3>Network</h3>
+      <div class="netgrid">
+        <div><div class="l">Chain ID</div><div class="v">4663</div></div>
+        <div><div class="l">TPS (est.)</div><div class="v" id="net-tps">—</div></div>
+        <div><div class="l">Avg Gas</div><div class="v" id="net-gas">—</div></div>
+        <div><div class="l">Latency</div><div class="v" id="net-latency">—</div></div>
+      </div>
+    </div>
+    <div class="side-sec">
+      <h3>Watchlist</h3>
+      <div id="watchlist"><div style="color:var(--muted); font-size:12px;">Click a collection → “Watch” to pin it here.</div></div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>Data source: rpc.mainnet.chain.robinhood.com + robinhoodchain.blockscout.com — no synthetic data.</span>
+  <span id="footer-note">Poll mode active</span>
+</footer>
+
+<div id="overlay">
+  <div id="modal"></div>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+/* =========================================================================
+   MINT TAPE — Robinhood Chain live NFT mint tracker
+   Single-file client. Talks directly to Robinhood Chain (chain id 4663)
+   and its public Blockscout explorer. No mock data: every row below is
+   built from a real Transfer / TransferSingle / TransferBatch log emitted
+   from the zero address, read straight off the chain.
+   ========================================================================= */
+
+const CFG = {
+  chainId: 4663,
+  defaultRpc: 'https://rpc.mainnet.chain.robinhood.com',
+  blockscoutBase: 'https://robinhoodchain.blockscout.com/api/v2',
+  pollMs: 4000,          // public RPC is rate-limited; keep this gentle
+  maxBlockRange: 200,    // cap per-poll getLogs range
+  feedCap: 600,          // rows kept in memory / DOM
+  zeroAddr: '0x0000000000000000000000000000000000000000',
+};
+
+let provider = null;
+let usingWs = false;
+let lastBlock = 0;
+let paused = false;
+let pollTimer = null;
+
+const state = {
+  feed: [],                 // array of mint event objects, newest first
+  collections: new Map(),   // address -> collection meta
+  wallets: new Map(),       // address -> {count, lastSeen}
+  bytecodeSeen: new Map(),  // codehash -> [addresses] (duplicate-contract heuristic)
+  activeFilter: 'all',
+  sort: 'time',
+  watchlist: new Set(),
+};
+
+let TOPIC_TRANSFER, TOPIC_T_SINGLE, TOPIC_T_BATCH, TOPIC_ZERO;
+
+function initTopics(){
+  TOPIC_TRANSFER = ethers.id('Transfer(address,address,uint256)');
+  TOPIC_T_SINGLE  = ethers.id('TransferSingle(address,address,address,uint256,uint256)');
+  TOPIC_T_BATCH   = ethers.id('TransferBatch(address,address,address,uint256[],uint256[])');
+  TOPIC_ZERO      = ethers.zeroPadValue(ethers.ZeroAddress, 32);
+}
+
+const MIN_ABI = [
+  'function name() view returns (string)',
+  'function symbol() view returns (string)',
+  'function totalSupply() view returns (uint256)',
+  'function owner() view returns (address)',
+  'function supportsInterface(bytes4) view returns (bool)',
+  'function maxSupply() view returns (uint256)',
+  'function mintPrice() view returns (uint256)',
+];
+
+// ---------------------------------------------------------------------
+// Connection
+// ---------------------------------------------------------------------
+async function connect(customUrl){
+  setConn('connecting', 'connecting…');
+  try{
+    const url = customUrl || CFG.defaultRpc;
+    if (url.startsWith('wss://') || url.startsWith('ws://')){
+      provider = new ethers.WebSocketProvider(url, CFG.chainId);
+      usingWs = true;
+    } else {
+      provider = new ethers.JsonRpcProvider(url, CFG.chainId, { staticNetwork: true });
+      usingWs = false;
+    }
+    const bn = await provider.getBlockNumber();
+    lastBlock = bn;
+    setConn('live', usingWs ? 'live (ws)' : 'live (poll)');
+    document.getElementById('footer-note').textContent = usingWs
+      ? 'WebSocket subscription active — near-instant updates'
+      : `Polling every ${CFG.pollMs/1000}s (public endpoint is rate-limited)`;
+    startLoop();
+  }catch(err){
+    setConn('err', 'connection failed');
+    toast('Could not reach the RPC endpoint. Check the URL in Settings, or try again — the public endpoint is rate limited.');
+    console.error(err);
+  }
+}
+
+function setConn(kind, label){
+  const dot = document.getElementById('conn-dot');
+  dot.className = 'dot' + (kind === 'live' ? ' live' : kind === 'err' ? ' err' : '');
+  document.getElementById('conn-label').textContent = label;
+}
+
+function startLoop(){
+  if (pollTimer) clearInterval(pollTimer);
+  if (usingWs){
+    // Each new block pushed over the socket triggers an immediate log scan,
+    // so mints show up as soon as the block lands rather than on the next
+    // poll tick. The interval below just becomes a longer-interval safety
+    // net in case the socket stalls.
+    provider.on('block', (bn) => handleNewHead(bn));
+    pollTimer = setInterval(pollOnce, CFG.pollMs * 4);
+  } else {
+    pollTimer = setInterval(pollOnce, CFG.pollMs);
+  }
+  pollOnce();
+}
+
+async function handleNewHead(bn){
+  if (paused) return;
+  document.getElementById('blk-label').textContent = bn.toLocaleString();
+  document.getElementById('s-block').textContent = bn.toLocaleString();
+  pollOnce();
+}
+
+let pollInFlight = false;
+async function pollOnce(){
+  if (paused || !provider || pollInFlight) return;
+  pollInFlight = true;
+  const t0 = performance.now();
+  try{
+    const head = await provider.getBlockNumber();
+    document.getElementById('blk-label').textContent = head.toLocaleString();
+    document.getElementById('s-block').textContent = head.toLocaleString();
+    document.getElementById('net-latency').textContent = Math.round(performance.now() - t0) + 'ms';
+
+    if (head <= lastBlock){ pollInFlight = false; return; }
+    const from = Math.max(lastBlock + 1, head - CFG.maxBlockRange);
+    const to = head;
+
+    const [transfers, singles, batches] = await Promise.all([
+      provider.getLogs({ fromBlock: from, toBlock: to, topics: [TOPIC_TRANSFER, TOPIC_ZERO] }),
+      provider.getLogs({ fromBlock: from, toBlock: to, topics: [TOPIC_T_SINGLE, null, TOPIC_ZERO] }),
+      provider.getLogs({ fromBlock: from, toBlock: to, topics: [TOPIC_T_BATCH, null, TOPIC_ZERO] }),
+    ]);
+
+    lastBlock = head;
+
+    // ERC721 mints: Transfer(from,to,tokenId) all three indexed -> 4 topics total.
+    // (Same event signature is used by ERC20's non-indexed Transfer, which
+    // only carries 3 topics — that's how we tell them apart.)
+    const erc721Mints = transfers.filter(l => l.topics.length === 4);
+    for (const log of erc721Mints) await handleMintLog(log, 'ERC-721', 1n);
+
+    for (const log of singles){
+      const [id, value] = ethers.AbiCoder.defaultAbiCoder().decode(['uint256','uint256'], log.data);
+      await handleMintLog(log, 'ERC-1155', value);
+    }
+    for (const log of batches){
+      const [ids, values] = ethers.AbiCoder.defaultAbiCoder().decode(['uint256[]','uint256[]'], log.data);
+      const total = values.reduce((a,b)=>a+b, 0n);
+      await handleMintLog(log, 'ERC-1155', total);
+    }
+
+    updateNetworkStats(head);
+  }catch(err){
+    console.error('poll error', err);
+    setConn('err', 'rpc error — retrying');
+    setTimeout(()=>{ if(!paused) setConn('live', usingWs ? 'live (ws)' : 'live (poll)'); }, CFG.pollMs);
+  }finally{
+    pollInFlight = false;
+  }
+}
+
+// ---------------------------------------------------------------------
+// Mint handling
+// ---------------------------------------------------------------------
+async function handleMintLog(log, standard, qty){
+  const contract = log.address;
+  const toTopic = standard === 'ERC-721' ? log.topics[2] : log.topics[3];
+  const to = ethers.getAddress('0x' + toTopic.slice(-40));
+
+  let coll = state.collections.get(contract);
+  if (!coll){
+    coll = await buildCollectionRecord(contract, standard);
+    state.collections.set(contract, coll);
+    coll.isNew = true;
+    bump('#s-newcoll');
+  }
+  coll.mintedCount = (coll.mintedCount || 0) + Number(qty);
+  coll.lastMintAt = Date.now();
+  coll.mintTimestamps = coll.mintTimestamps || [];
+  coll.mintTimestamps.push(Date.now());
+
+  touchWallet(to);
+
+  const entry = {
+    id: log.transactionHash + ':' + log.logIndex,
+    time: Date.now(),
+    contract, standard, qty: Number(qty),
+    to, txHash: log.transactionHash, blockNumber: Number(log.blockNumber),
+    price: null, gasUsed: null, priceLoaded: false,
+  };
+  state.feed.unshift(entry);
+  if (state.feed.length > CFG.feedCap) state.feed.length = CFG.feedCap;
+
+  bump('#s-mints');
+  updateWalletCount();
+
+  renderFeed();
+  renderTrending();
+  pushTicker(coll, entry);
+  maybeNotify(coll, entry);
+
+  // Lazily fetch tx value/gas for the most recent items only, to respect
+  // the public endpoint's rate limits (see README for scaling notes).
+  if (state.feed.indexOf(entry) < 25){
+    fetchTxDetails(entry, coll);
+  }
+}
+
+async function fetchTxDetails(entry, coll){
+  try{
+    const [tx, receipt] = await Promise.all([
+      provider.getTransaction(entry.txHash),
+      provider.getTransactionReceipt(entry.txHash),
+    ]);
+    entry.price = tx ? tx.value : 0n;
+    entry.gasUsed = receipt ? receipt.gasUsed : null;
+    entry.priceLoaded = true;
+    if (entry.price === 0n){ bump('#s-free'); } else { bump('#s-paid'); }
+    renderFeed();
+  }catch(e){ /* best-effort only */ }
+}
+
+async function buildCollectionRecord(address, standard){
+  const rec = {
+    address, standard, name: null, symbol: null, totalSupply: null,
+    owner: null, verified: null, riskLevel: 'unknown', riskFlags: [],
+    mintedCount: 0, mintTimestamps: [], watched: false,
+  };
+  try{
+    const c = new ethers.Contract(address, MIN_ABI, provider);
+    const [name, symbol] = await Promise.allSettled([c.name(), c.symbol()]);
+    rec.name = name.status === 'fulfilled' ? name.value : shortAddr(address);
+    rec.symbol = symbol.status === 'fulfilled' ? symbol.value : '';
+  }catch(e){ rec.name = shortAddr(address); }
+
+  // Fire-and-forget enrichment so the first mint isn't blocked on it.
+  enrichCollection(rec);
+  return rec;
+}
+
+async function enrichCollection(rec){
+  try{
+    const code = await provider.getCode(rec.address);
+    rec.codeHash = ethers.keccak256(code);
+    const bucket = state.bytecodeSeen.get(rec.codeHash) || [];
+    bucket.push(rec.address);
+    state.bytecodeSeen.set(rec.codeHash, bucket);
+    rec.duplicateBytecodeCount = bucket.length;
+  }catch(e){}
+
+  try{
+    const c = new ethers.Contract(rec.address, MIN_ABI, provider);
+    const [ts, owner] = await Promise.allSettled([c.totalSupply(), c.owner()]);
+    rec.totalSupply = ts.status === 'fulfilled' ? ts.value.toString() : null;
+    rec.owner = owner.status === 'fulfilled' ? owner.value : null;
+  }catch(e){}
+
+  try{
+    const res = await fetch(`${CFG.blockscoutBase}/smart-contracts/${rec.address}`);
+    if (res.ok){
+      const j = await res.json();
+      rec.verified = !!j.is_verified;
+      rec.creationTx = j.creation_tx_hash || null;
+    } else {
+      rec.verified = false;
+    }
+  }catch(e){ rec.verified = null; /* explorer unreachable — leave unknown */ }
+
+  computeRisk(rec);
+  renderFeed();
+  renderTrending();
+}
+
+function computeRisk(rec){
+  const flags = [];
+  let score = 0;
+
+  if (rec.verified === false){ flags.push({t:'Unverified source', s:'warn'}); score += 1; }
+  if (rec.verified === true){ flags.push({t:'Verified contract', s:'ok'}); score -= 1; }
+  if (rec.duplicateBytecodeCount && rec.duplicateBytecodeCount >= 5){
+    flags.push({t:`Bytecode reused ${rec.duplicateBytecodeCount}×`, s:'bad'}); score += 2;
+  }
+  if (rec.totalSupply && Number(rec.totalSupply) > 1_000_000){
+    flags.push({t:'Very large supply', s:'warn'}); score += 1;
+  }
+  if (!rec.owner){ flags.push({t:'No detectable owner()', s:'ok'}); }
+  if (rec.owner === CFG.zeroAddr){ flags.push({t:'Ownership renounced', s:'ok'}); score -= 1; }
+
+  if (score >= 3) rec.riskLevel = 'danger';
+  else if (score >= 2) rec.riskLevel = 'high';
+  else if (score >= 1) rec.riskLevel = 'med';
+  else rec.riskLevel = 'low';
+  rec.riskFlags = flags;
+}
+
+function touchWallet(addr){
+  const w = state.wallets.get(addr) || { count:0, first:Date.now() };
+  w.count += 1; w.last = Date.now();
+  state.wallets.set(addr, w);
+}
+function updateWalletCount(){ document.getElementById('s-wallets').textContent = state.wallets.size; }
+
+function bump(sel){
+  const el = document.querySelector(sel);
+  el.textContent = (parseInt(el.textContent.replace(/,/g,''))||0) + 1;
+}
+
+// ---------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------
+function shortAddr(a){ return a ? a.slice(0,6) + '…' + a.slice(-4) : ''; }
+function fmtEth(wei){
+  if (wei == null) return '…';
+  if (wei === 0n) return 'FREE';
+  return Number(ethers.formatEther(wei)).toFixed(4) + ' ETH';
+}
+function timeAgo(ts){
+  const s = Math.floor((Date.now()-ts)/1000);
+  if (s < 5) return 'now';
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  return Math.floor(s/3600) + 'h ago';
+}
+
+function passesFilter(entry, coll){
+  const f = state.activeFilter;
+  if (f === 'all') return true;
+  if (f === 'free') return entry.priceLoaded && entry.price === 0n;
+  if (f === 'paid') return entry.priceLoaded && entry.price > 0n;
+  if (f === 'erc721') return entry.standard === 'ERC-721';
+  if (f === 'erc1155') return entry.standard === 'ERC-1155';
+  if (f === 'new') return coll && coll.isNew;
+  if (f === 'verified') return coll && coll.verified === true;
+  if (f === 'danger') return coll && (coll.riskLevel === 'danger' || coll.riskLevel === 'high');
+  if (f === 'live') return Date.now() - entry.time < 60_000;
+  return true;
+}
+
+function renderFeed(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const feedEl = document.getElementById('feed');
+  let rows = state.feed.filter(e => {
+    const coll = state.collections.get(e.contract);
+    if (!passesFilter(e, coll)) return false;
+    if (!q) return true;
+    return (coll?.name||'').toLowerCase().includes(q)
+      || e.contract.toLowerCase().includes(q)
+      || e.to.toLowerCase().includes(q)
+      || e.txHash.toLowerCase().includes(q);
+  });
+
+  if (state.sort === 'qty') rows = rows.slice().sort((a,b)=>b.qty-a.qty);
+  else if (state.sort === 'price') rows = rows.slice().sort((a,b)=>Number((b.price||0n)-(a.price||0n)));
+  else if (state.sort === 'gas') rows = rows.slice().sort((a,b)=>Number((b.gasUsed||0n)-(a.gasUsed||0n)));
+
+  if (rows.length === 0){
+    feedEl.innerHTML = `<div id="empty"><b>No mints match this view</b>Try clearing filters or the search box.</div>`;
+    return;
+  }
+
+  const html = rows.slice(0, 200).map(e => {
+    const coll = state.collections.get(e.contract) || {};
+    const risk = coll.riskLevel || 'unknown';
+    const riskClass = risk === 'unknown' ? '' : 'risk-' + risk;
+    const priceLabel = e.priceLoaded ? fmtEth(e.price) : '…';
+    return `<div class="row" data-id="${e.id}" data-contract="${e.contract}">
+      <div class="t mono">${timeAgo(e.time)}</div>
+      <div class="coll">
+        <div class="thumb"></div>
+        <div style="min-width:0;">
+          <div class="cname">${escapeHtml(coll.name || shortAddr(e.contract))}</div>
+          <div class="std">${shortAddr(e.contract)}</div>
+        </div>
+      </div>
+      <div class="std">${e.standard}</div>
+      <div class="qty mono">${e.qty}</div>
+      <div class="price ${e.priceLoaded && e.price===0n ? 'free':''} mono">${priceLabel}</div>
+      <div class="who mono">${shortAddr(e.to)}</div>
+      <div class="risklbl ${riskClass}">${risk}</div>
+      <div class="blk mono">#${e.blockNumber}</div>
+    </div>`;
+  }).join('');
+  feedEl.innerHTML = html;
+
+  feedEl.querySelectorAll('.row').forEach(r => {
+    r.addEventListener('click', () => openCollectionModal(r.dataset.contract));
+  });
+}
+
+function renderTrending(){
+  const now = Date.now();
+  const arr = Array.from(state.collections.values());
+  arr.forEach(c => { c.mintTimestamps = (c.mintTimestamps||[]).filter(t => now - t < 5*60*1000); });
+  const ranked = arr.filter(c => c.mintTimestamps.length > 0)
+    .sort((a,b)=>b.mintTimestamps.length - a.mintTimestamps.length)
+    .slice(0,8);
+
+  const el = document.getElementById('trending');
+  if (ranked.length === 0){
+    el.innerHTML = '<div style="color:var(--muted); font-size:12px;">Nothing trending yet.</div>';
+  } else {
+    el.innerHTML = ranked.map((c,i) => `
+      <div class="trend-row" data-contract="${c.address}">
+        <span class="trend-rank">${i+1}</span>
+        <span class="trend-name">${escapeHtml(c.name||shortAddr(c.address))}</span>
+        <span class="trend-vel">${c.mintTimestamps.length}/5m</span>
+      </div>`).join('');
+    el.querySelectorAll('.trend-row').forEach(r => r.addEventListener('click', ()=>openCollectionModal(r.dataset.contract)));
+  }
+
+  // mints/min headline stat = sum of velocities in the last minute
+  const perMin = Array.from(state.feed).filter(e => now - e.time < 60_000).length;
+  document.getElementById('s-velocity').textContent = perMin;
+}
+
+function pushTicker(coll, entry){
+  const track = document.getElementById('ticker-track');
+  const item = document.createElement('div');
+  item.className = 'tick-item';
+  const priceTxt = entry.priceLoaded ? (entry.price===0n?'FREE':fmtEth(entry.price)) : '·';
+  item.innerHTML = `<span class="sym">${escapeHtml((coll.symbol||coll.name||shortAddr(entry.contract)).slice(0,8).toUpperCase())}</span> minted ×${entry.qty} <span class="${entry.qty>1?'up':''}">${priceTxt}</span>`;
+  track.appendChild(item);
+  while (track.children.length > 60) track.removeChild(track.firstChild);
+}
+
+function updateNetworkStats(head){
+  // crude TPS estimate from recent mint velocity as a stand-in signal
+  const recent = state.feed.filter(e => Date.now() - e.time < 15000).length;
+  document.getElementById('net-tps').textContent = (recent/15).toFixed(2);
+  const gasSamples = state.feed.filter(e=>e.gasUsed).slice(0,20).map(e=>Number(e.gasUsed));
+  if (gasSamples.length){
+    const avg = Math.round(gasSamples.reduce((a,b)=>a+b,0)/gasSamples.length);
+    document.getElementById('net-gas').textContent = avg.toLocaleString();
+  }
+}
+
+function escapeHtml(s){
+  return String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+// ---------------------------------------------------------------------
+// Modal
+// ---------------------------------------------------------------------
+function openCollectionModal(address){
+  const coll = state.collections.get(address);
+  if (!coll) return;
+  const flags = (coll.riskFlags||[]).map(f=>`<span class="flag ${f.s}">${escapeHtml(f.t)}</span>`).join('');
+  document.getElementById('modal').innerHTML = `
+    <span class="modal-close" id="modal-close">×</span>
+    <h2>${escapeHtml(coll.name||shortAddr(address))}</h2>
+    <div class="mono" style="color:var(--muted); font-size:12px;">${address}</div>
+    <div class="kv">
+      <div class="k">Standard</div><div class="v">${coll.standard}</div>
+      <div class="k">Symbol</div><div class="v">${escapeHtml(coll.symbol||'—')}</div>
+      <div class="k">Total Supply</div><div class="v">${coll.totalSupply ?? '—'}</div>
+      <div class="k">Minted (seen)</div><div class="v">${coll.mintedCount||0}</div>
+      <div class="k">Owner</div><div class="v">${coll.owner||'—'}</div>
+      <div class="k">Verified</div><div class="v">${coll.verified===true?'yes':coll.verified===false?'no':'unknown'}</div>
+      ${coll.creationTx ? `<div class="k">Creation Tx</div><div class="v">${shortAddr(coll.creationTx)}</div>` : ''}
+      <div class="k">Explorer</div><div class="v"><a href="https://robinhoodchain.blockscout.com/address/${address}" target="_blank" rel="noopener">view on Blockscout ↗</a></div>
+    </div>
+    <div class="risk-box">
+      <h4>Risk signal — ${coll.riskLevel}</h4>
+      <div style="font-size:11.5px; color:var(--muted);">Heuristic only. This is not a security audit — verify independently before minting or trading.</div>
+      <div class="risk-flags">${flags || '<span class="flag">No signals yet</span>'}</div>
+    </div>
+    <div class="row-inline" style="margin-top:16px;">
+      <button id="btn-watch">${state.watchlist.has(address)?'★ Watching':'☆ Watch this collection'}</button>
+    </div>
+  `;
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('modal-close').onclick = closeModal;
+  document.getElementById('btn-watch').onclick = () => toggleWatch(address);
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('show'); }
+document.getElementById('overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeModal(); });
+
+function toggleWatch(address){
+  if (state.watchlist.has(address)) state.watchlist.delete(address); else state.watchlist.add(address);
+  renderWatchlist();
+  openCollectionModal(address);
+}
+function renderWatchlist(){
+  const el = document.getElementById('watchlist');
+  if (state.watchlist.size === 0){
+    el.innerHTML = '<div style="color:var(--muted); font-size:12px;">Click a collection → “Watch” to pin it here.</div>';
+    return;
+  }
+  el.innerHTML = Array.from(state.watchlist).map(addr => {
+    const c = state.collections.get(addr) || {};
+    return `<div class="trend-row" data-contract="${addr}"><span class="trend-name">${escapeHtml(c.name||shortAddr(addr))}</span><span class="trend-vel">${c.mintedCount||0} mint(s)</span></div>`;
+  }).join('');
+  el.querySelectorAll('.trend-row').forEach(r => r.addEventListener('click', ()=>openCollectionModal(r.dataset.contract)));
+}
+
+// ---------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------
+const notifyPrefs = { desktop:false, sound:false, discordWebhook:'', telegramWebhook:'', onlyFree:false, onlyNew:true };
+
+function toast(msg){
+  const wrap = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(()=>t.remove(), 6000);
+}
+
+function beep(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.type='sine'; o.frequency.value=880; g.gain.value=0.05;
+    o.connect(g); g.connect(ctx.destination); o.start();
+    setTimeout(()=>{ o.stop(); ctx.close(); }, 140);
+  }catch(e){}
+}
+
+async function maybeNotify(coll, entry){
+  const isNew = coll.isNew;
+  const isFree = entry.priceLoaded ? entry.price === 0n : false;
+  if (notifyPrefs.onlyNew && !isNew) return;
+  if (notifyPrefs.onlyFree && !isFree) return;
+
+  const msg = `${coll.name || shortAddr(entry.contract)} — new collection minting on Robinhood Chain`;
+  if (notifyPrefs.desktop && 'Notification' in window && Notification.permission === 'granted'){
+    new Notification('Mint Tape', { body: msg });
+  }
+  if (notifyPrefs.sound) beep();
+  if (notifyPrefs.discordWebhook){
+    fetch(notifyPrefs.discordWebhook, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ content: msg + ` — https://robinhoodchain.blockscout.com/address/${entry.contract}` })
+    }).catch(()=>toast('Discord webhook call failed (browser CORS or invalid URL).'));
+  }
+  if (notifyPrefs.telegramWebhook){
+    fetch(notifyPrefs.telegramWebhook, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ text: msg })
+    }).catch(()=>toast('Telegram webhook call failed.'));
+  }
+}
+
+// ---------------------------------------------------------------------
+// Settings panel
+// ---------------------------------------------------------------------
+function openSettings(){
+  document.getElementById('modal').innerHTML = `
+    <span class="modal-close" id="modal-close">×</span>
+    <h2>Settings</h2>
+    <label class="small">RPC or WebSocket URL (leave blank for the public endpoint)</label>
+    <div class="row-inline">
+      <input type="text" id="rpc-url" style="flex:1;" placeholder="https://your-provider.example/… or wss://…">
+      <button id="btn-reconnect">Reconnect</button>
+    </div>
+    <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+      The public endpoint is rate-limited. For production latency, use your own Alchemy, QuickNode, dRPC, Blockdaemon, or Validation Cloud endpoint for Robinhood Chain (chain id 4663) — ideally a WebSocket URL for push updates.
+    </div>
+
+    <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
+      <div class="toggle-line">Desktop notifications <div class="switch ${notifyPrefs.desktop?'on':''}" id="tg-desktop"><div class="knob"></div></div></div>
+      <div class="toggle-line">Sound alert <div class="switch ${notifyPrefs.sound?'on':''}" id="tg-sound"><div class="knob"></div></div></div>
+      <div class="toggle-line">Only new collections <div class="switch ${notifyPrefs.onlyNew?'on':''}" id="tg-onlynew"><div class="knob"></div></div></div>
+      <div class="toggle-line">Only free mints <div class="switch ${notifyPrefs.onlyFree?'on':''}" id="tg-onlyfree"><div class="knob"></div></div></div>
+      <label class="small">Discord webhook URL (optional)</label>
+      <input type="text" id="hook-discord" style="width:100%;" value="${escapeHtml(notifyPrefs.discordWebhook)}" placeholder="https://discord.com/api/webhooks/…">
+      <label class="small">Telegram bot webhook URL (optional)</label>
+      <input type="text" id="hook-telegram" style="width:100%;" value="${escapeHtml(notifyPrefs.telegramWebhook)}" placeholder="https://api.telegram.org/bot…/sendMessage-style proxy">
+      <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+        Webhook calls fire directly from your browser. Some providers block browser-origin requests — for guaranteed delivery, proxy them through a small backend (see README).
+      </div>
+      <button class="primary" id="btn-save-notify" style="margin-top:12px;">Save</button>
+    </div>
+  `;
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('modal-close').onclick = closeModal;
+  document.getElementById('btn-reconnect').onclick = () => {
+    const url = document.getElementById('rpc-url').value.trim();
+    if (pollTimer) clearInterval(pollTimer);
+    if (provider && provider.destroy) try{provider.destroy();}catch(e){}
+    connect(url || undefined);
+    closeModal();
+  };
+  const bind = (id, key) => document.getElementById(id).onclick = (e) => {
+    notifyPrefs[key] = !notifyPrefs[key];
+    e.target.classList.toggle('on');
+  };
+  bind('tg-desktop','desktop'); bind('tg-sound','sound');
+  bind('tg-onlynew','onlyNew'); bind('tg-onlyfree','onlyFree');
+  document.getElementById('btn-save-notify').onclick = () => {
+    notifyPrefs.discordWebhook = document.getElementById('hook-discord').value.trim();
+    notifyPrefs.telegramWebhook = document.getElementById('hook-telegram').value.trim();
+    if (notifyPrefs.desktop && 'Notification' in window && Notification.permission !== 'granted'){
+      Notification.requestPermission();
+    }
+    toast('Settings saved.');
+    closeModal();
+  };
+}
+
+// ---------------------------------------------------------------------
+// Wallet lookup
+// ---------------------------------------------------------------------
+async function openWalletLookup(){
+  document.getElementById('modal').innerHTML = `
+    <span class="modal-close" id="modal-close">×</span>
+    <h2>Wallet Lookup</h2>
+    <div class="row-inline">
+      <input type="text" id="wallet-input" style="flex:1;" placeholder="0x… wallet address">
+      <button class="primary" id="btn-wallet-go">Look up</button>
+    </div>
+    <div id="wallet-result" style="margin-top:16px;"></div>
+  `;
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('modal-close').onclick = closeModal;
+  document.getElementById('btn-wallet-go').onclick = async () => {
+    const raw = document.getElementById('wallet-input').value.trim();
+    const out = document.getElementById('wallet-result');
+    if (!ethers.isAddress(raw)){ out.innerHTML = '<div class="flag bad">Not a valid address</div>'; return; }
+    const addr = ethers.getAddress(raw);
+    out.innerHTML = '<div style="color:var(--muted); font-size:12px;">Loading…</div>';
+
+    const local = state.wallets.get(addr);
+    const seenMints = state.feed.filter(e => e.to === addr);
+
+    let holdingsHtml = '<div style="font-size:12px; color:var(--muted);">Holdings lookup unavailable from explorer.</div>';
+    try{
+      const res = await fetch(`${CFG.blockscoutBase}/addresses/${addr}/nft?type=ERC-721,ERC-1155`);
+      if (res.ok){
+        const j = await res.json();
+        const items = (j.items||[]).slice(0,10);
+        if (items.length){
+          holdingsHtml = '<div class="kv" style="grid-template-columns:1fr 1fr;">' + items.map(it =>
+            `<div class="k">${escapeHtml(it.token?.name||'—')}</div><div class="v">#${it.id||''}</div>`
+          ).join('') + '</div>';
+        } else {
+          holdingsHtml = '<div style="font-size:12px; color:var(--muted);">No NFTs found for this address (or the explorer index is still catching up).</div>';
+        }
+      }
+    }catch(e){}
+
+    out.innerHTML = `
+      <div class="kv">
+        <div class="k">Mints seen this session</div><div class="v">${seenMints.length}</div>
+        <div class="k">First seen</div><div class="v">${local ? new Date(local.first).toLocaleTimeString() : '—'}</div>
+        <div class="k">Explorer</div><div class="v"><a href="https://robinhoodchain.blockscout.com/address/${addr}" target="_blank" rel="noopener">view on Blockscout ↗</a></div>
+      </div>
+      <h3 style="margin-top:16px; font-family:'Barlow Condensed'; font-size:15px;">Recent holdings (via explorer)</h3>
+      ${holdingsHtml}
+    `;
+  };
+}
+
+// ---------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------
+document.getElementById('search').addEventListener('input', renderFeed);
+document.getElementById('sort-select').addEventListener('change', e => { state.sort = e.target.value; renderFeed(); });
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+    chip.classList.add('active');
+    state.activeFilter = chip.dataset.filter;
+    renderFeed();
+  });
+});
+document.getElementById('btn-settings').addEventListener('click', openSettings);
+document.getElementById('btn-wallet').addEventListener('click', openWalletLookup);
+document.getElementById('btn-pause').addEventListener('click', (e) => {
+  paused = !paused;
+  e.target.textContent = paused ? 'Resume Feed' : 'Pause Feed';
+  setConn(paused ? 'err' : 'live', paused ? 'paused' : (usingWs ? 'live (ws)' : 'live (poll)'));
+});
+document.getElementById('btn-export-csv').addEventListener('click', () => exportData('csv'));
+document.getElementById('btn-export-json').addEventListener('click', () => exportData('json'));
+
+function exportData(kind){
+  const rows = state.feed.map(e => {
+    const c = state.collections.get(e.contract) || {};
+    return {
+      time: new Date(e.time).toISOString(), collection: c.name || '', contract: e.contract,
+      standard: e.standard, quantity: e.qty, priceEth: e.priceLoaded ? ethers.formatEther(e.price) : '',
+      wallet: e.to, txHash: e.txHash, blockNumber: e.blockNumber, riskLevel: c.riskLevel || '',
+    };
+  });
+  let blob, filename;
+  if (kind === 'json'){
+    blob = new Blob([JSON.stringify(rows, null, 2)], {type:'application/json'});
+    filename = 'mint-tape-export.json';
+  } else {
+    const headers = Object.keys(rows[0]||{time:'',collection:'',contract:'',standard:'',quantity:'',priceEth:'',wallet:'',txHash:'',blockNumber:'',riskLevel:''});
+    const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => `"${String(r[h]).replace(/"/g,'""')}"`).join(','))).join('\n');
+    blob = new Blob([csv], {type:'text/csv'});
+    filename = 'mint-tape-export.csv';
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ---------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------
+window.addEventListener('load', () => {
+  if (typeof ethers === 'undefined'){
+    setConn('err', 'ethers.js failed to load');
+    toast('Could not load the ethers.js library from the CDN — check your internet connection and reload.');
+    return;
+  }
+  initTopics();
+  connect();
+});
+</script>
+</body>
+</html>
