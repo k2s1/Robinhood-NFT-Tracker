@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MINT TAPE — Robinhood Chain Live NFT Feed</title>
+<title>MINT TAPE — Robinhood Chain Trending Mints</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
@@ -22,25 +22,11 @@
     --muted-2:#525d66;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;height:100%;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100%;}
   ::-webkit-scrollbar{width:8px;height:8px;}
   ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
   a{color:var(--amber);text-decoration:none;}
   .mono{font-family:'JetBrains Mono',monospace;}
-  .display{font-family:'Barlow Condensed',sans-serif;letter-spacing:0.02em;}
-
-  /* ---------- TICKER ---------- */
-  #ticker-wrap{
-    background:#000; border-bottom:1px solid var(--line); overflow:hidden; height:34px;
-    display:flex; align-items:center; white-space:nowrap; position:relative;
-  }
-  #ticker-track{display:inline-flex; align-items:center; animation:scrollTicker 40s linear infinite; padding-left:100%;}
-  #ticker-wrap:hover #ticker-track{animation-play-state:paused;}
-  @keyframes scrollTicker{ from{transform:translateX(0);} to{transform:translateX(-100%);} }
-  .tick-item{display:inline-flex; align-items:center; gap:6px; padding:0 18px; font-size:12.5px; font-family:'JetBrains Mono',monospace; border-right:1px solid #1c2126;}
-  .tick-item .sym{color:var(--amber); font-weight:600;}
-  .tick-item .up{color:var(--teal);}
-  .tick-item .down{color:var(--red);}
 
   /* ---------- HEADER ---------- */
   header{
@@ -84,9 +70,10 @@
 
   /* ---------- STAT STRIP ---------- */
   #stats{
-    display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--line);
+    display:grid; grid-template-columns:repeat(6,1fr); gap:1px; background:var(--line);
     border-bottom:1px solid var(--line);
   }
+  @media (max-width:900px){ #stats{grid-template-columns:repeat(3,1fr);} }
   .stat{background:var(--panel); padding:10px 14px;}
   .stat .lbl{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; font-family:'JetBrains Mono',monospace;}
   .stat .val{font-family:'Barlow Condensed'; font-size:22px; font-weight:600; margin-top:2px;}
@@ -94,71 +81,105 @@
   .stat .val.teal{color:var(--teal);}
 
   /* ---------- LAYOUT ---------- */
-  #app{display:grid; grid-template-columns:1fr 320px; gap:0; height:calc(100vh - 34px - 66px - 62px);}
-  @media (max-width:980px){ #app{grid-template-columns:1fr;} #sidebar{order:2;} }
+  #app{display:grid; grid-template-columns:1fr 320px; gap:0; align-items:start;}
+  @media (max-width:980px){ #app{grid-template-columns:1fr;} #sidebar{order:2; border-left:none;} }
 
-  #main{display:flex; flex-direction:column; min-width:0; border-right:1px solid var(--line);}
+  #main{min-width:0; border-right:1px solid var(--line); min-height:calc(100vh - 200px);}
   #controls{
-    display:flex; gap:8px; padding:10px 14px; border-bottom:1px solid var(--line);
+    display:flex; gap:8px; padding:12px 16px; border-bottom:1px solid var(--line);
     background:var(--panel); flex-wrap:wrap; align-items:center;
   }
   #controls input[type=text]{flex:1; min-width:180px;}
-  .chip{
-    padding:5px 11px; border:1px solid var(--line); border-radius:20px; font-size:11.5px; cursor:pointer;
-    color:var(--muted); background:var(--panel-2); white-space:nowrap; font-family:'JetBrains Mono',monospace;
-  }
-  .chip.active{border-color:var(--amber); color:var(--amber);}
-  #chipbar{display:flex; gap:6px; padding:8px 14px; overflow-x:auto; border-bottom:1px solid var(--line); background:var(--panel);}
 
-  /* ---------- FEED (trade-tape style) ---------- */
-  #feed-head{
-    display:grid; grid-template-columns: 90px 1.3fr 90px 90px 110px 130px 60px 90px;
-    gap:8px; padding:7px 14px; font-size:10px; color:var(--muted-2); text-transform:uppercase;
-    letter-spacing:.05em; border-bottom:1px solid var(--line); font-family:'JetBrains Mono',monospace;
+  /* ---------- TIMEFRAME TABS ---------- */
+  #tf-tabs{display:flex; gap:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:none;}
+  .tf-tab{
+    padding:7px 16px; font-size:12px; font-family:'JetBrains Mono',monospace; cursor:pointer;
+    color:var(--muted); background:var(--panel-2); border-right:1px solid var(--line); user-select:none;
   }
-  #feed{flex:1; overflow-y:auto; background:#0d1012;}
-  .row{
-    display:grid; grid-template-columns: 90px 1.3fr 90px 90px 110px 130px 60px 90px;
-    gap:8px; padding:9px 14px; border-bottom:1px solid #171c20; font-size:12.5px; align-items:center;
-    cursor:pointer; animation:flashin .6s ease-out;
-  }
-  .row:hover{background:#12171b;}
-  @keyframes flashin{ from{background:rgba(255,176,32,.14);} to{background:transparent;} }
-  .row .t{color:var(--muted-2); font-family:'JetBrains Mono',monospace; font-size:11px;}
-  .row .coll{display:flex; align-items:center; gap:8px; min-width:0;}
-  .row .thumb{width:26px;height:26px;border-radius:4px; background:#20262c; flex:none; object-fit:cover;}
-  .row .cname{white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600;}
-  .row .std{font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace;}
-  .row .price{font-family:'JetBrains Mono',monospace; color:var(--teal);}
-  .row .price.free{color:var(--muted);}
-  .row .qty{font-family:'JetBrains Mono',monospace;}
-  .row .who{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .row .risklbl{font-size:10px; font-family:'JetBrains Mono',monospace; padding:2px 7px; border-radius:3px; text-align:center;}
-  .risk-low{color:var(--teal); border:1px solid var(--teal);}
-  .risk-med{color:var(--amber); border:1px solid var(--amber);}
-  .risk-high{color:#ff9d5c; border:1px solid #ff9d5c;}
-  .risk-danger{color:var(--red); border:1px solid var(--red);}
-  .row .blk{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted);}
+  .tf-tab:last-child{border-right:none;}
+  .tf-tab.active{background:var(--amber); color:#1a1200; font-weight:600;}
+  .tf-tab:not(.active):hover{color:var(--text);}
 
-  #empty{padding:60px 20px; text-align:center; color:var(--muted);}
-  #empty b{color:var(--text); display:block; font-family:'Barlow Condensed'; font-size:20px; margin-bottom:6px;}
+  /* ---------- TRENDING LIST ---------- */
+  #trend-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 16px 6px; color:var(--muted);
+  }
+  #trend-head h2{font-family:'Barlow Condensed'; font-size:18px; text-transform:uppercase; letter-spacing:.06em; margin:0; color:var(--text);}
+  #trend-head h2 span{color:var(--amber);}
+  #trend-head .note{font-size:11px; font-family:'JetBrains Mono',monospace;}
+
+  #trend-list{padding:8px 16px 24px; display:flex; flex-direction:column; gap:10px;}
+  .tcard{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px; cursor:pointer; transition:border-color .15s;
+  }
+  .tcard:hover{border-color:var(--amber-dim);}
+  .tcard.rank-1{border-color:var(--amber);}
+  .tcard-top{display:flex; align-items:center; gap:12px; min-width:0;}
+  .trank{
+    font-family:'Barlow Condensed'; font-weight:700; font-size:20px; color:var(--muted-2);
+    width:34px; height:34px; border:1px solid var(--line); border-radius:8px; flex:none;
+    display:flex; align-items:center; justify-content:center; background:var(--panel-2);
+  }
+  .tcard.rank-1 .trank{color:#1a1200; background:var(--amber); border-color:var(--amber);}
+  .tcard.rank-2 .trank, .tcard.rank-3 .trank{color:var(--amber); border-color:var(--amber-dim);}
+  .tmeta{flex:1; min-width:0;}
+  .tname{font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:8px;}
+  .tsub{font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tvel{text-align:right; flex:none;}
+  .tvel .n{font-family:'Barlow Condensed'; font-weight:700; font-size:24px; color:var(--teal); line-height:1;}
+  .tvel .l{font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; text-transform:uppercase; margin-top:2px;}
+
+  .badge{font-size:9.5px; font-family:'JetBrains Mono',monospace; padding:2px 7px; border-radius:3px; flex:none; text-transform:uppercase;}
+  .badge.verified{color:var(--teal); border:1px solid var(--teal);}
+  .badge.risk-low{color:var(--teal); border:1px solid var(--teal);}
+  .badge.risk-med{color:var(--amber); border:1px solid var(--amber);}
+  .badge.risk-high{color:#ff9d5c; border:1px solid #ff9d5c;}
+  .badge.risk-danger{color:var(--red); border:1px solid var(--red);}
+  .badge.new{color:var(--amber); border:1px solid var(--amber-dim); background:rgba(255,176,32,.08);}
+
+  /* ---------- SUPPLY BAR ---------- */
+  .supply{margin-top:12px;}
+  .supply-labels{display:flex; justify-content:space-between; font-size:11px; font-family:'JetBrains Mono',monospace; margin-bottom:5px;}
+  .supply-labels .minted{color:var(--text);}
+  .supply-labels .minted b{color:var(--amber); font-weight:600;}
+  .supply-labels .pct{color:var(--teal);}
+  .supply-labels .unknown{color:var(--muted-2);}
+  .bar{height:8px; background:#0c0f12; border:1px solid var(--line); border-radius:6px; overflow:hidden;}
+  .bar .fill{height:100%; background:var(--amber); border-radius:6px; transition:width .6s ease; min-width:2px;}
+  .bar .fill.done{background:var(--teal);}
+  .bar .fill.session{background:var(--amber-dim);}
+
+  #trend-empty{padding:60px 20px; text-align:center; color:var(--muted);}
+  #trend-empty b{color:var(--text); display:block; font-family:'Barlow Condensed'; font-size:20px; margin-bottom:6px;}
 
   /* ---------- SIDEBAR ---------- */
-  #sidebar{display:flex; flex-direction:column; overflow-y:auto; background:var(--panel);}
+  #sidebar{background:var(--panel); border-left:1px solid var(--line);}
   .side-sec{border-bottom:1px solid var(--line); padding:14px;}
   .side-sec h3{font-family:'Barlow Condensed'; font-size:14px; text-transform:uppercase; letter-spacing:.05em; margin:0 0 10px; color:var(--muted);}
-  .trend-row{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px dashed #1e2429; font-size:12.5px;}
-  .trend-row:last-child{border-bottom:none;}
-  .trend-rank{color:var(--amber); font-family:'JetBrains Mono',monospace; width:18px; flex:none;}
-  .trend-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .trend-vel{font-family:'JetBrains Mono',monospace; color:var(--teal); font-size:11px;}
+
+  .act-row{
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    padding:7px 0; border-bottom:1px dashed #1e2429; font-size:12px;
+  }
+  .act-row:last-child{border-bottom:none;}
+  .act-row .nm{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;}
+  .act-row .nm:hover{color:var(--amber);}
+  .act-row .ct{font-family:'JetBrains Mono',monospace; color:var(--teal); font-size:11px; flex:none;}
+  .act-row .tm{font-family:'JetBrains Mono',monospace; color:var(--muted-2); font-size:10px; flex:none; width:52px; text-align:right;}
 
   .netgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:11.5px;}
   .netgrid div{background:var(--panel-2); border:1px solid var(--line); border-radius:6px; padding:8px;}
   .netgrid .l{color:var(--muted); font-size:10px; text-transform:uppercase; font-family:'JetBrains Mono',monospace;}
   .netgrid .v{font-family:'JetBrains Mono',monospace; font-size:14px; margin-top:2px;}
 
-  textarea{width:100%; background:#0c0f12; border:1px solid var(--line); color:var(--text); border-radius:6px; padding:8px; font-family:'JetBrains Mono',monospace; font-size:11.5px;}
+  .trend-row{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px dashed #1e2429; font-size:12.5px; cursor:pointer;}
+  .trend-row:last-child{border-bottom:none;}
+  .trend-name{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .trend-vel{font-family:'JetBrains Mono',monospace; color:var(--teal); font-size:11px;}
+
   label.small{font-size:11px; color:var(--muted); display:block; margin:8px 0 4px;}
   .row-inline{display:flex; gap:6px; align-items:center; margin-top:6px;}
   .toggle-line{display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:6px 0;}
@@ -194,20 +215,16 @@
     padding:8px 16px; border-top:1px solid var(--line); background:var(--panel); font-size:11px; color:var(--muted-2);
     display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-family:'JetBrains Mono',monospace;
   }
-  #toast-wrap{position:fixed; bottom:16px; right:16px; z-index:60; display:flex; flex-direction:column; gap:8px;}
-  .toast{background:var(--panel-2); border:1px solid var(--amber); border-radius:8px; padding:10px 14px; font-size:12.5px; max-width:280px; animation:flashin .4s;}
 </style>
 </head>
 <body>
-
-<div id="ticker-wrap"><div id="ticker-track"></div></div>
 
 <header>
   <div class="brand">
     <div class="mark">RH</div>
     <div>
       <h1>MINT<span>TAPE</span></h1>
-      <div class="sub">Robinhood Chain · live NFT mint intelligence</div>
+      <div class="sub">Robinhood Chain · trending NFT mints</div>
     </div>
   </div>
   <div class="status-row">
@@ -222,49 +239,40 @@
 <div id="stats">
   <div class="stat"><div class="lbl">Block Height</div><div class="val amber" id="s-block">—</div></div>
   <div class="stat"><div class="lbl">Mints Tracked</div><div class="val" id="s-mints">0</div></div>
-  <div class="stat"><div class="lbl">New Collections</div><div class="val" id="s-newcoll">0</div></div>
+  <div class="stat"><div class="lbl">Collections</div><div class="val" id="s-newcoll">0</div></div>
   <div class="stat"><div class="lbl">Active Wallets</div><div class="val" id="s-wallets">0</div></div>
-  <div class="stat"><div class="lbl">Free Mints</div><div class="val teal" id="s-free">0</div></div>
-  <div class="stat"><div class="lbl">Paid Mints</div><div class="val" id="s-paid">0</div></div>
-  <div class="stat"><div class="lbl">Mints / Min</div><div class="val amber" id="s-velocity">0</div></div>
+  <div class="stat"><div class="lbl">Mints / Min</div><div class="val teal" id="s-velocity">0</div></div>
+  <div class="stat"><div class="lbl">Hottest Now</div><div class="val amber" id="s-hottest" style="font-size:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">—</div></div>
 </div>
 
 <div id="app">
   <div id="main">
     <div id="controls">
-      <input type="text" id="search" placeholder="search collection, contract, wallet, or tx hash…">
-      <select id="sort-select">
-        <option value="time">Newest first</option>
-        <option value="qty">Highest quantity</option>
-        <option value="price">Highest price</option>
-        <option value="gas">Highest gas</option>
-      </select>
+      <div id="tf-tabs">
+        <div class="tf-tab" data-tf="300000">5m</div>
+        <div class="tf-tab active" data-tf="900000">15m</div>
+        <div class="tf-tab" data-tf="1800000">30m</div>
+        <div class="tf-tab" data-tf="3600000">1h</div>
+      </div>
+      <input type="text" id="search" placeholder="search collection or contract…">
       <button id="btn-export-csv">Export CSV</button>
       <button id="btn-export-json">Export JSON</button>
     </div>
-    <div id="chipbar">
-      <div class="chip active" data-filter="all">All</div>
-      <div class="chip" data-filter="live">Live now</div>
-      <div class="chip" data-filter="free">Free mint</div>
-      <div class="chip" data-filter="paid">Paid mint</div>
-      <div class="chip" data-filter="erc721">ERC-721</div>
-      <div class="chip" data-filter="erc1155">ERC-1155</div>
-      <div class="chip" data-filter="new">New collections</div>
-      <div class="chip" data-filter="verified">Verified</div>
-      <div class="chip" data-filter="danger">High risk</div>
+
+    <div id="trend-head">
+      <h2>Trending <span id="tf-label">15m</span></h2>
+      <div class="note mono">ranked by mints in window · supply bars update live</div>
     </div>
-    <div id="feed-head">
-      <div>Time</div><div>Collection</div><div>Std</div><div>Qty</div><div>Price</div><div>Wallet</div><div>Risk</div><div>Block</div>
-    </div>
-    <div id="feed">
-      <div id="empty"><b>Listening for mints…</b>Waiting for the first Transfer-from-zero event on Robinhood Chain. This can take a moment on the public rate-limited endpoint — add your own RPC key in Settings for lower latency.</div>
+
+    <div id="trend-list">
+      <div id="trend-empty"><b>Listening for mints…</b>Building the trending board from live Transfer-from-zero events on Robinhood Chain. Collections appear here as soon as they get minted — give it a moment on the public rate-limited endpoint.</div>
     </div>
   </div>
 
   <div id="sidebar">
     <div class="side-sec">
-      <h3>Trending Collections</h3>
-      <div id="trending"><div style="color:var(--muted); font-size:12px;">Nothing trending yet.</div></div>
+      <h3>Live Activity</h3>
+      <div id="activity"><div style="color:var(--muted); font-size:12px;">No mints yet this session.</div></div>
     </div>
     <div class="side-sec">
       <h3>Network</h3>
@@ -291,24 +299,26 @@
   <div id="modal"></div>
 </div>
 
-<div id="toast-wrap"></div>
-
 <script>
 /* =========================================================================
-   MINT TAPE — Robinhood Chain live NFT mint tracker
-   Single-file client. Talks directly to Robinhood Chain (chain id 4663)
-   and its public Blockscout explorer. No mock data: every row below is
-   built from a real Transfer / TransferSingle / TransferBatch log emitted
-   from the zero address, read straight off the chain.
+   MINT TAPE — Robinhood Chain trending NFT mint tracker
+   Collection-centric view: ranks collections by mints inside a selectable
+   time window (5m / 15m / 30m / 1h) and shows minted vs total supply as a
+   live progress bar. No mock data: every number is built from real
+   Transfer / TransferSingle / TransferBatch logs emitted from the zero
+   address, read straight off the chain, plus live totalSupply()/maxSupply()
+   reads from the collection contracts.
    ========================================================================= */
 
 const CFG = {
   chainId: 4663,
   defaultRpc: 'https://rpc.mainnet.chain.robinhood.com',
   blockscoutBase: 'https://robinhoodchain.blockscout.com/api/v2',
-  pollMs: 4000,          // public RPC is rate-limited; keep this gentle
-  maxBlockRange: 200,    // cap per-poll getLogs range
-  feedCap: 600,          // rows kept in memory / DOM
+  pollMs: 4000,            // public RPC is rate-limited; keep this gentle
+  maxBlockRange: 200,      // cap per-poll getLogs range
+  feedCap: 1500,           // raw mint events kept for exports/stats
+  windowMax: 3600_000,     // keep 1h of per-collection timestamps
+  supplyRefreshMs: 25_000, // re-read totalSupply for top collections
   zeroAddr: '0x0000000000000000000000000000000000000000',
 };
 
@@ -317,14 +327,15 @@ let usingWs = false;
 let lastBlock = 0;
 let paused = false;
 let pollTimer = null;
+let supplyTimer = null;
+let repaintTimer = null;
 
 const state = {
-  feed: [],                 // array of mint event objects, newest first
+  feed: [],                 // raw mint events, newest first (for export/lookup)
   collections: new Map(),   // address -> collection meta
-  wallets: new Map(),       // address -> {count, lastSeen}
-  bytecodeSeen: new Map(),  // codehash -> [addresses] (duplicate-contract heuristic)
-  activeFilter: 'all',
-  sort: 'time',
+  wallets: new Map(),       // address -> {count, first, last}
+  bytecodeSeen: new Map(),  // codehash -> [addresses]
+  timeframe: 900_000,       // active trending window in ms (default 15m)
   watchlist: new Set(),
 };
 
@@ -342,9 +353,8 @@ const MIN_ABI = [
   'function symbol() view returns (string)',
   'function totalSupply() view returns (uint256)',
   'function owner() view returns (address)',
-  'function supportsInterface(bytes4) view returns (bool)',
   'function maxSupply() view returns (uint256)',
-  'function mintPrice() view returns (uint256)',
+  'function MAX_SUPPLY() view returns (uint256)',
 ];
 
 // ---------------------------------------------------------------------
@@ -370,7 +380,6 @@ async function connect(customUrl){
     startLoop();
   }catch(err){
     setConn('err', 'connection failed');
-    toast('Could not reach the RPC endpoint. Check the URL in Settings, or try again — the public endpoint is rate limited.');
     console.error(err);
   }
 }
@@ -383,16 +392,16 @@ function setConn(kind, label){
 
 function startLoop(){
   if (pollTimer) clearInterval(pollTimer);
+  if (supplyTimer) clearInterval(supplyTimer);
+  if (repaintTimer) clearInterval(repaintTimer);
   if (usingWs){
-    // Each new block pushed over the socket triggers an immediate log scan,
-    // so mints show up as soon as the block lands rather than on the next
-    // poll tick. The interval below just becomes a longer-interval safety
-    // net in case the socket stalls.
     provider.on('block', (bn) => handleNewHead(bn));
     pollTimer = setInterval(pollOnce, CFG.pollMs * 4);
   } else {
     pollTimer = setInterval(pollOnce, CFG.pollMs);
   }
+  supplyTimer = setInterval(refreshSupplies, CFG.supplyRefreshMs);
+  repaintTimer = setInterval(() => { renderTrending(); renderActivity(); }, 10_000);
   pollOnce();
 }
 
@@ -426,23 +435,23 @@ async function pollOnce(){
 
     lastBlock = head;
 
-    // ERC721 mints: Transfer(from,to,tokenId) all three indexed -> 4 topics total.
-    // (Same event signature is used by ERC20's non-indexed Transfer, which
-    // only carries 3 topics — that's how we tell them apart.)
+    // ERC721 mints: Transfer(from,to,tokenId) all three indexed -> 4 topics.
     const erc721Mints = transfers.filter(l => l.topics.length === 4);
     for (const log of erc721Mints) await handleMintLog(log, 'ERC-721', 1n);
 
     for (const log of singles){
-      const [id, value] = ethers.AbiCoder.defaultAbiCoder().decode(['uint256','uint256'], log.data);
+      const [, value] = ethers.AbiCoder.defaultAbiCoder().decode(['uint256','uint256'], log.data);
       await handleMintLog(log, 'ERC-1155', value);
     }
     for (const log of batches){
-      const [ids, values] = ethers.AbiCoder.defaultAbiCoder().decode(['uint256[]','uint256[]'], log.data);
+      const [, values] = ethers.AbiCoder.defaultAbiCoder().decode(['uint256[]','uint256[]'], log.data);
       const total = values.reduce((a,b)=>a+b, 0n);
       await handleMintLog(log, 'ERC-1155', total);
     }
 
-    updateNetworkStats(head);
+    // one repaint per poll cycle — no per-mint popping
+    renderAll();
+    updateNetworkStats();
   }catch(err){
     console.error('poll error', err);
     setConn('err', 'rpc error — retrying');
@@ -453,71 +462,47 @@ async function pollOnce(){
 }
 
 // ---------------------------------------------------------------------
-// Mint handling
+// Mint handling — aggregate per collection instead of a row-per-mint tape
 // ---------------------------------------------------------------------
 async function handleMintLog(log, standard, qty){
   const contract = log.address;
   const toTopic = standard === 'ERC-721' ? log.topics[2] : log.topics[3];
   const to = ethers.getAddress('0x' + toTopic.slice(-40));
+  const now = Date.now();
 
   let coll = state.collections.get(contract);
   if (!coll){
     coll = await buildCollectionRecord(contract, standard);
     state.collections.set(contract, coll);
     coll.isNew = true;
-    bump('#s-newcoll');
+    document.getElementById('s-newcoll').textContent = state.collections.size;
   }
-  coll.mintedCount = (coll.mintedCount || 0) + Number(qty);
-  coll.lastMintAt = Date.now();
-  coll.mintTimestamps = coll.mintTimestamps || [];
-  coll.mintTimestamps.push(Date.now());
+  coll.mintedSession = (coll.mintedSession || 0) + Number(qty);
+  coll.lastMintAt = now;
+  coll.events = coll.events || [];
+  coll.events.push({ t: now, qty: Number(qty), wallet: to });
+  // prune anything older than the largest window (1h)
+  const cutoff = now - CFG.windowMax;
+  while (coll.events.length && coll.events[0].t < cutoff) coll.events.shift();
 
   touchWallet(to);
 
-  const entry = {
-    id: log.transactionHash + ':' + log.logIndex,
-    time: Date.now(),
-    contract, standard, qty: Number(qty),
+  state.feed.unshift({
+    time: now, contract, standard, qty: Number(qty),
     to, txHash: log.transactionHash, blockNumber: Number(log.blockNumber),
-    price: null, gasUsed: null, priceLoaded: false,
-  };
-  state.feed.unshift(entry);
+  });
   if (state.feed.length > CFG.feedCap) state.feed.length = CFG.feedCap;
 
   bump('#s-mints');
-  updateWalletCount();
-
-  renderFeed();
-  renderTrending();
-  pushTicker(coll, entry);
-  maybeNotify(coll, entry);
-
-  // Lazily fetch tx value/gas for the most recent items only, to respect
-  // the public endpoint's rate limits (see README for scaling notes).
-  if (state.feed.indexOf(entry) < 25){
-    fetchTxDetails(entry, coll);
-  }
-}
-
-async function fetchTxDetails(entry, coll){
-  try{
-    const [tx, receipt] = await Promise.all([
-      provider.getTransaction(entry.txHash),
-      provider.getTransactionReceipt(entry.txHash),
-    ]);
-    entry.price = tx ? tx.value : 0n;
-    entry.gasUsed = receipt ? receipt.gasUsed : null;
-    entry.priceLoaded = true;
-    if (entry.price === 0n){ bump('#s-free'); } else { bump('#s-paid'); }
-    renderFeed();
-  }catch(e){ /* best-effort only */ }
+  document.getElementById('s-wallets').textContent = state.wallets.size;
 }
 
 async function buildCollectionRecord(address, standard){
   const rec = {
-    address, standard, name: null, symbol: null, totalSupply: null,
+    address, standard, name: null, symbol: null,
+    totalSupply: null, maxSupply: null,
     owner: null, verified: null, riskLevel: 'unknown', riskFlags: [],
-    mintedCount: 0, mintTimestamps: [], watched: false,
+    mintedSession: 0, events: [],
   };
   try{
     const c = new ethers.Contract(address, MIN_ABI, provider);
@@ -526,8 +511,7 @@ async function buildCollectionRecord(address, standard){
     rec.symbol = symbol.status === 'fulfilled' ? symbol.value : '';
   }catch(e){ rec.name = shortAddr(address); }
 
-  // Fire-and-forget enrichment so the first mint isn't blocked on it.
-  enrichCollection(rec);
+  enrichCollection(rec); // fire-and-forget
   return rec;
 }
 
@@ -543,9 +527,13 @@ async function enrichCollection(rec){
 
   try{
     const c = new ethers.Contract(rec.address, MIN_ABI, provider);
-    const [ts, owner] = await Promise.allSettled([c.totalSupply(), c.owner()]);
-    rec.totalSupply = ts.status === 'fulfilled' ? ts.value.toString() : null;
+    const [ts, owner, max1, max2] = await Promise.allSettled([
+      c.totalSupply(), c.owner(), c.maxSupply(), c.MAX_SUPPLY(),
+    ]);
+    rec.totalSupply = ts.status === 'fulfilled' ? Number(ts.value) : null;
     rec.owner = owner.status === 'fulfilled' ? owner.value : null;
+    if (max1.status === 'fulfilled' && Number(max1.value) > 0) rec.maxSupply = Number(max1.value);
+    else if (max2.status === 'fulfilled' && Number(max2.value) > 0) rec.maxSupply = Number(max2.value);
   }catch(e){}
 
   try{
@@ -557,23 +545,36 @@ async function enrichCollection(rec){
     } else {
       rec.verified = false;
     }
-  }catch(e){ rec.verified = null; /* explorer unreachable — leave unknown */ }
+  }catch(e){ rec.verified = null; }
 
   computeRisk(rec);
-  renderFeed();
+  renderTrending();
+}
+
+// Periodically re-read totalSupply for the top trending collections so the
+// "minted / total supply" bar keeps moving in real time.
+async function refreshSupplies(){
+  if (paused || !provider) return;
+  const top = rankedCollections(state.timeframe).slice(0, 10);
+  await Promise.allSettled(top.map(async (rec) => {
+    try{
+      const c = new ethers.Contract(rec.address, MIN_ABI, provider);
+      const ts = await c.totalSupply();
+      rec.totalSupply = Number(ts);
+    }catch(e){}
+  }));
   renderTrending();
 }
 
 function computeRisk(rec){
   const flags = [];
   let score = 0;
-
   if (rec.verified === false){ flags.push({t:'Unverified source', s:'warn'}); score += 1; }
   if (rec.verified === true){ flags.push({t:'Verified contract', s:'ok'}); score -= 1; }
   if (rec.duplicateBytecodeCount && rec.duplicateBytecodeCount >= 5){
     flags.push({t:`Bytecode reused ${rec.duplicateBytecodeCount}×`, s:'bad'}); score += 2;
   }
-  if (rec.totalSupply && Number(rec.totalSupply) > 1_000_000){
+  if (rec.totalSupply && rec.totalSupply > 1_000_000){
     flags.push({t:'Very large supply', s:'warn'}); score += 1;
   }
   if (!rec.owner){ flags.push({t:'No detectable owner()', s:'ok'}); }
@@ -591,7 +592,6 @@ function touchWallet(addr){
   w.count += 1; w.last = Date.now();
   state.wallets.set(addr, w);
 }
-function updateWalletCount(){ document.getElementById('s-wallets').textContent = state.wallets.size; }
 
 function bump(sel){
   const el = document.querySelector(sel);
@@ -599,14 +599,9 @@ function bump(sel){
 }
 
 // ---------------------------------------------------------------------
-// Rendering
+// Helpers
 // ---------------------------------------------------------------------
 function shortAddr(a){ return a ? a.slice(0,6) + '…' + a.slice(-4) : ''; }
-function fmtEth(wei){
-  if (wei == null) return '…';
-  if (wei === 0n) return 'FREE';
-  return Number(ethers.formatEther(wei)).toFixed(4) + ' ETH';
-}
 function timeAgo(ts){
   const s = Math.floor((Date.now()-ts)/1000);
   if (s < 5) return 'now';
@@ -614,121 +609,157 @@ function timeAgo(ts){
   if (s < 3600) return Math.floor(s/60) + 'm ago';
   return Math.floor(s/3600) + 'h ago';
 }
-
-function passesFilter(entry, coll){
-  const f = state.activeFilter;
-  if (f === 'all') return true;
-  if (f === 'free') return entry.priceLoaded && entry.price === 0n;
-  if (f === 'paid') return entry.priceLoaded && entry.price > 0n;
-  if (f === 'erc721') return entry.standard === 'ERC-721';
-  if (f === 'erc1155') return entry.standard === 'ERC-1155';
-  if (f === 'new') return coll && coll.isNew;
-  if (f === 'verified') return coll && coll.verified === true;
-  if (f === 'danger') return coll && (coll.riskLevel === 'danger' || coll.riskLevel === 'high');
-  if (f === 'live') return Date.now() - entry.time < 60_000;
-  return true;
+const compactFmt = new Intl.NumberFormat('en', { notation:'compact', maximumFractionDigits:1 });
+function fmtNum(n){
+  if (n == null) return '—';
+  return n >= 10_000 ? compactFmt.format(n) : n.toLocaleString();
+}
+function tfLabel(ms){
+  if (ms === 300000) return '5m';
+  if (ms === 900000) return '15m';
+  if (ms === 1800000) return '30m';
+  return '1h';
+}
+function escapeHtml(s){
+  return String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-function renderFeed(){
-  const q = document.getElementById('search').value.trim().toLowerCase();
-  const feedEl = document.getElementById('feed');
-  let rows = state.feed.filter(e => {
-    const coll = state.collections.get(e.contract);
-    if (!passesFilter(e, coll)) return false;
-    if (!q) return true;
-    return (coll?.name||'').toLowerCase().includes(q)
-      || e.contract.toLowerCase().includes(q)
-      || e.to.toLowerCase().includes(q)
-      || e.txHash.toLowerCase().includes(q);
-  });
-
-  if (state.sort === 'qty') rows = rows.slice().sort((a,b)=>b.qty-a.qty);
-  else if (state.sort === 'price') rows = rows.slice().sort((a,b)=>Number((b.price||0n)-(a.price||0n)));
-  else if (state.sort === 'gas') rows = rows.slice().sort((a,b)=>Number((b.gasUsed||0n)-(a.gasUsed||0n)));
-
-  if (rows.length === 0){
-    feedEl.innerHTML = `<div id="empty"><b>No mints match this view</b>Try clearing filters or the search box.</div>`;
-    return;
+// mints inside a window for a collection
+function windowStats(coll, windowMs){
+  const cut = Date.now() - windowMs;
+  let mints = 0;
+  const minters = new Set();
+  for (let i = coll.events.length - 1; i >= 0; i--){
+    const ev = coll.events[i];
+    if (ev.t < cut) break;
+    mints += ev.qty;
+    minters.add(ev.wallet);
   }
+  return { mints, minters: minters.size };
+}
 
-  const html = rows.slice(0, 200).map(e => {
-    const coll = state.collections.get(e.contract) || {};
-    const risk = coll.riskLevel || 'unknown';
-    const riskClass = risk === 'unknown' ? '' : 'risk-' + risk;
-    const priceLabel = e.priceLoaded ? fmtEth(e.price) : '…';
-    return `<div class="row" data-id="${e.id}" data-contract="${e.contract}">
-      <div class="t mono">${timeAgo(e.time)}</div>
-      <div class="coll">
-        <div class="thumb"></div>
-        <div style="min-width:0;">
-          <div class="cname">${escapeHtml(coll.name || shortAddr(e.contract))}</div>
-          <div class="std">${shortAddr(e.contract)}</div>
-        </div>
-      </div>
-      <div class="std">${e.standard}</div>
-      <div class="qty mono">${e.qty}</div>
-      <div class="price ${e.priceLoaded && e.price===0n ? 'free':''} mono">${priceLabel}</div>
-      <div class="who mono">${shortAddr(e.to)}</div>
-      <div class="risklbl ${riskClass}">${risk}</div>
-      <div class="blk mono">#${e.blockNumber}</div>
-    </div>`;
-  }).join('');
-  feedEl.innerHTML = html;
+function rankedCollections(windowMs){
+  return Array.from(state.collections.values())
+    .map(c => { c._win = windowStats(c, windowMs); return c; })
+    .filter(c => c._win.mints > 0)
+    .sort((a,b) => b._win.mints - a._win.mints);
+}
 
-  feedEl.querySelectorAll('.row').forEach(r => {
-    r.addEventListener('click', () => openCollectionModal(r.dataset.contract));
-  });
+// ---------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------
+function renderAll(){
+  renderTrending();
+  renderActivity();
+  renderVelocity();
 }
 
 function renderTrending(){
-  const now = Date.now();
-  const arr = Array.from(state.collections.values());
-  arr.forEach(c => { c.mintTimestamps = (c.mintTimestamps||[]).filter(t => now - t < 5*60*1000); });
-  const ranked = arr.filter(c => c.mintTimestamps.length > 0)
-    .sort((a,b)=>b.mintTimestamps.length - a.mintTimestamps.length)
-    .slice(0,8);
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  let ranked = rankedCollections(state.timeframe);
+  if (q){
+    ranked = ranked.filter(c =>
+      (c.name||'').toLowerCase().includes(q) || c.address.toLowerCase().includes(q));
+  }
+  ranked = ranked.slice(0, 20);
 
-  const el = document.getElementById('trending');
+  const el = document.getElementById('trend-list');
   if (ranked.length === 0){
-    el.innerHTML = '<div style="color:var(--muted); font-size:12px;">Nothing trending yet.</div>';
-  } else {
-    el.innerHTML = ranked.map((c,i) => `
-      <div class="trend-row" data-contract="${c.address}">
-        <span class="trend-rank">${i+1}</span>
-        <span class="trend-name">${escapeHtml(c.name||shortAddr(c.address))}</span>
-        <span class="trend-vel">${c.mintTimestamps.length}/5m</span>
-      </div>`).join('');
-    el.querySelectorAll('.trend-row').forEach(r => r.addEventListener('click', ()=>openCollectionModal(r.dataset.contract)));
+    el.innerHTML = `<div id="trend-empty"><b>${q ? 'No collections match this search' : 'Nothing trending in this window yet'}</b>${q ? 'Try clearing the search box.' : 'Waiting for mints inside the selected timeframe — try a longer window like 1h.'}</div>`;
+    document.getElementById('s-hottest').textContent = '—';
+    return;
   }
 
-  // mints/min headline stat = sum of velocities in the last minute
-  const perMin = Array.from(state.feed).filter(e => now - e.time < 60_000).length;
+  document.getElementById('s-hottest').textContent = ranked[0].name || shortAddr(ranked[0].address);
+
+  el.innerHTML = ranked.map((c, i) => {
+    const win = c._win;
+    const minted = c.totalSupply != null ? c.totalSupply : c.mintedSession;
+    const max = c.maxSupply;
+    let supplyHtml;
+    if (max && max > 0){
+      const pct = Math.min(100, (minted / max) * 100);
+      supplyHtml = `
+        <div class="supply">
+          <div class="supply-labels">
+            <span class="minted"><b>${fmtNum(minted)}</b> / ${fmtNum(max)} minted</span>
+            <span class="pct">${pct >= 99.95 ? 'SOLD OUT' : pct.toFixed(1) + '%'}</span>
+          </div>
+          <div class="bar"><div class="fill ${pct >= 99.95 ? 'done' : ''}" style="width:${pct.toFixed(2)}%"></div></div>
+        </div>`;
+    } else {
+      // no on-chain max supply — show live total minted, bar scaled vs hottest
+      const topMints = ranked[0]._win.mints || 1;
+      const relPct = Math.max(4, Math.min(100, (win.mints / topMints) * 100));
+      supplyHtml = `
+        <div class="supply">
+          <div class="supply-labels">
+            <span class="minted"><b>${fmtNum(minted)}</b> minted total</span>
+            <span class="unknown">supply cap: open / unknown</span>
+          </div>
+          <div class="bar"><div class="fill session" style="width:${relPct.toFixed(2)}%"></div></div>
+        </div>`;
+    }
+
+    const badges = [
+      c.verified === true ? '<span class="badge verified">verified</span>' : '',
+      c.isNew ? '<span class="badge new">new</span>' : '',
+      c.riskLevel && c.riskLevel !== 'unknown' ? `<span class="badge risk-${c.riskLevel}">${c.riskLevel}</span>` : '',
+    ].join('');
+
+    return `<div class="tcard rank-${i+1}" data-contract="${c.address}">
+      <div class="tcard-top">
+        <div class="trank">${i+1}</div>
+        <div class="tmeta">
+          <div class="tname">${escapeHtml(c.name || shortAddr(c.address))} ${badges}</div>
+          <div class="tsub">${shortAddr(c.address)} · ${c.standard} · ${win.minters} unique minter${win.minters===1?'':'s'} · last mint ${timeAgo(c.lastMintAt)}</div>
+        </div>
+        <div class="tvel">
+          <div class="n">${fmtNum(win.mints)}</div>
+          <div class="l">mints / ${tfLabel(state.timeframe)}</div>
+        </div>
+      </div>
+      ${supplyHtml}
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.tcard').forEach(card =>
+    card.addEventListener('click', () => openCollectionModal(card.dataset.contract)));
+}
+
+// Sidebar: grouped recent activity — one line per collection, updated in
+// place (no per-mint pop-ups).
+function renderActivity(){
+  const el = document.getElementById('activity');
+  const recent = Array.from(state.collections.values())
+    .filter(c => c.lastMintAt)
+    .sort((a,b) => b.lastMintAt - a.lastMintAt)
+    .slice(0, 12);
+  if (recent.length === 0){
+    el.innerHTML = '<div style="color:var(--muted); font-size:12px;">No mints yet this session.</div>';
+    return;
+  }
+  el.innerHTML = recent.map(c => {
+    const w5 = windowStats(c, 300000);
+    return `<div class="act-row">
+      <span class="nm" data-contract="${c.address}">${escapeHtml(c.name || shortAddr(c.address))}</span>
+      <span class="ct">+${fmtNum(w5.mints)}/5m</span>
+      <span class="tm">${timeAgo(c.lastMintAt)}</span>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.nm').forEach(n =>
+    n.addEventListener('click', () => openCollectionModal(n.dataset.contract)));
+}
+
+function renderVelocity(){
+  const now = Date.now();
+  const perMin = state.feed.filter(e => now - e.time < 60_000).reduce((a,e)=>a+e.qty,0);
   document.getElementById('s-velocity').textContent = perMin;
 }
 
-function pushTicker(coll, entry){
-  const track = document.getElementById('ticker-track');
-  const item = document.createElement('div');
-  item.className = 'tick-item';
-  const priceTxt = entry.priceLoaded ? (entry.price===0n?'FREE':fmtEth(entry.price)) : '·';
-  item.innerHTML = `<span class="sym">${escapeHtml((coll.symbol||coll.name||shortAddr(entry.contract)).slice(0,8).toUpperCase())}</span> minted ×${entry.qty} <span class="${entry.qty>1?'up':''}">${priceTxt}</span>`;
-  track.appendChild(item);
-  while (track.children.length > 60) track.removeChild(track.firstChild);
-}
-
-function updateNetworkStats(head){
-  // crude TPS estimate from recent mint velocity as a stand-in signal
+function updateNetworkStats(){
   const recent = state.feed.filter(e => Date.now() - e.time < 15000).length;
   document.getElementById('net-tps').textContent = (recent/15).toFixed(2);
-  const gasSamples = state.feed.filter(e=>e.gasUsed).slice(0,20).map(e=>Number(e.gasUsed));
-  if (gasSamples.length){
-    const avg = Math.round(gasSamples.reduce((a,b)=>a+b,0)/gasSamples.length);
-    document.getElementById('net-gas').textContent = avg.toLocaleString();
-  }
-}
-
-function escapeHtml(s){
-  return String(s??'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
 // ---------------------------------------------------------------------
@@ -738,6 +769,9 @@ function openCollectionModal(address){
   const coll = state.collections.get(address);
   if (!coll) return;
   const flags = (coll.riskFlags||[]).map(f=>`<span class="flag ${f.s}">${escapeHtml(f.t)}</span>`).join('');
+  const minted = coll.totalSupply != null ? coll.totalSupply : coll.mintedSession;
+  const w15 = windowStats(coll, 900000);
+  const w60 = windowStats(coll, 3600000);
   document.getElementById('modal').innerHTML = `
     <span class="modal-close" id="modal-close">×</span>
     <h2>${escapeHtml(coll.name||shortAddr(address))}</h2>
@@ -745,8 +779,10 @@ function openCollectionModal(address){
     <div class="kv">
       <div class="k">Standard</div><div class="v">${coll.standard}</div>
       <div class="k">Symbol</div><div class="v">${escapeHtml(coll.symbol||'—')}</div>
-      <div class="k">Total Supply</div><div class="v">${coll.totalSupply ?? '—'}</div>
-      <div class="k">Minted (seen)</div><div class="v">${coll.mintedCount||0}</div>
+      <div class="k">Minted (live)</div><div class="v">${fmtNum(minted)}</div>
+      <div class="k">Max Supply</div><div class="v">${coll.maxSupply ? fmtNum(coll.maxSupply) : 'open / unknown'}</div>
+      <div class="k">Mints last 15m</div><div class="v">${fmtNum(w15.mints)}</div>
+      <div class="k">Mints last 1h</div><div class="v">${fmtNum(w60.mints)}</div>
       <div class="k">Owner</div><div class="v">${coll.owner||'—'}</div>
       <div class="k">Verified</div><div class="v">${coll.verified===true?'yes':coll.verified===false?'no':'unknown'}</div>
       ${coll.creationTx ? `<div class="k">Creation Tx</div><div class="v">${shortAddr(coll.creationTx)}</div>` : ''}
@@ -781,58 +817,10 @@ function renderWatchlist(){
   }
   el.innerHTML = Array.from(state.watchlist).map(addr => {
     const c = state.collections.get(addr) || {};
-    return `<div class="trend-row" data-contract="${addr}"><span class="trend-name">${escapeHtml(c.name||shortAddr(addr))}</span><span class="trend-vel">${c.mintedCount||0} mint(s)</span></div>`;
+    const win = c.events ? windowStats(c, state.timeframe) : { mints: 0 };
+    return `<div class="trend-row" data-contract="${addr}"><span class="trend-name">${escapeHtml(c.name||shortAddr(addr))}</span><span class="trend-vel">${fmtNum(win.mints)}/${tfLabel(state.timeframe)}</span></div>`;
   }).join('');
   el.querySelectorAll('.trend-row').forEach(r => r.addEventListener('click', ()=>openCollectionModal(r.dataset.contract)));
-}
-
-// ---------------------------------------------------------------------
-// Notifications
-// ---------------------------------------------------------------------
-const notifyPrefs = { desktop:false, sound:false, discordWebhook:'', telegramWebhook:'', onlyFree:false, onlyNew:true };
-
-function toast(msg){
-  const wrap = document.getElementById('toast-wrap');
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  wrap.appendChild(t);
-  setTimeout(()=>t.remove(), 6000);
-}
-
-function beep(){
-  try{
-    const ctx = new (window.AudioContext||window.webkitAudioContext)();
-    const o = ctx.createOscillator(); const g = ctx.createGain();
-    o.type='sine'; o.frequency.value=880; g.gain.value=0.05;
-    o.connect(g); g.connect(ctx.destination); o.start();
-    setTimeout(()=>{ o.stop(); ctx.close(); }, 140);
-  }catch(e){}
-}
-
-async function maybeNotify(coll, entry){
-  const isNew = coll.isNew;
-  const isFree = entry.priceLoaded ? entry.price === 0n : false;
-  if (notifyPrefs.onlyNew && !isNew) return;
-  if (notifyPrefs.onlyFree && !isFree) return;
-
-  const msg = `${coll.name || shortAddr(entry.contract)} — new collection minting on Robinhood Chain`;
-  if (notifyPrefs.desktop && 'Notification' in window && Notification.permission === 'granted'){
-    new Notification('Mint Tape', { body: msg });
-  }
-  if (notifyPrefs.sound) beep();
-  if (notifyPrefs.discordWebhook){
-    fetch(notifyPrefs.discordWebhook, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ content: msg + ` — https://robinhoodchain.blockscout.com/address/${entry.contract}` })
-    }).catch(()=>toast('Discord webhook call failed (browser CORS or invalid URL).'));
-  }
-  if (notifyPrefs.telegramWebhook){
-    fetch(notifyPrefs.telegramWebhook, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ text: msg })
-    }).catch(()=>toast('Telegram webhook call failed.'));
-  }
 }
 
 // ---------------------------------------------------------------------
@@ -850,44 +838,16 @@ function openSettings(){
     <div style="font-size:11px; color:var(--muted); margin-top:6px;">
       The public endpoint is rate-limited. For production latency, use your own Alchemy, QuickNode, dRPC, Blockdaemon, or Validation Cloud endpoint for Robinhood Chain (chain id 4663) — ideally a WebSocket URL for push updates.
     </div>
-
-    <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
-      <div class="toggle-line">Desktop notifications <div class="switch ${notifyPrefs.desktop?'on':''}" id="tg-desktop"><div class="knob"></div></div></div>
-      <div class="toggle-line">Sound alert <div class="switch ${notifyPrefs.sound?'on':''}" id="tg-sound"><div class="knob"></div></div></div>
-      <div class="toggle-line">Only new collections <div class="switch ${notifyPrefs.onlyNew?'on':''}" id="tg-onlynew"><div class="knob"></div></div></div>
-      <div class="toggle-line">Only free mints <div class="switch ${notifyPrefs.onlyFree?'on':''}" id="tg-onlyfree"><div class="knob"></div></div></div>
-      <label class="small">Discord webhook URL (optional)</label>
-      <input type="text" id="hook-discord" style="width:100%;" value="${escapeHtml(notifyPrefs.discordWebhook)}" placeholder="https://discord.com/api/webhooks/…">
-      <label class="small">Telegram bot webhook URL (optional)</label>
-      <input type="text" id="hook-telegram" style="width:100%;" value="${escapeHtml(notifyPrefs.telegramWebhook)}" placeholder="https://api.telegram.org/bot…/sendMessage-style proxy">
-      <div style="font-size:11px; color:var(--muted); margin-top:6px;">
-        Webhook calls fire directly from your browser. Some providers block browser-origin requests — for guaranteed delivery, proxy them through a small backend (see README).
-      </div>
-      <button class="primary" id="btn-save-notify" style="margin-top:12px;">Save</button>
-    </div>
   `;
   document.getElementById('overlay').classList.add('show');
   document.getElementById('modal-close').onclick = closeModal;
   document.getElementById('btn-reconnect').onclick = () => {
     const url = document.getElementById('rpc-url').value.trim();
     if (pollTimer) clearInterval(pollTimer);
+    if (supplyTimer) clearInterval(supplyTimer);
+    if (repaintTimer) clearInterval(repaintTimer);
     if (provider && provider.destroy) try{provider.destroy();}catch(e){}
     connect(url || undefined);
-    closeModal();
-  };
-  const bind = (id, key) => document.getElementById(id).onclick = (e) => {
-    notifyPrefs[key] = !notifyPrefs[key];
-    e.target.classList.toggle('on');
-  };
-  bind('tg-desktop','desktop'); bind('tg-sound','sound');
-  bind('tg-onlynew','onlyNew'); bind('tg-onlyfree','onlyFree');
-  document.getElementById('btn-save-notify').onclick = () => {
-    notifyPrefs.discordWebhook = document.getElementById('hook-discord').value.trim();
-    notifyPrefs.telegramWebhook = document.getElementById('hook-telegram').value.trim();
-    if (notifyPrefs.desktop && 'Notification' in window && Notification.permission !== 'granted'){
-      Notification.requestPermission();
-    }
-    toast('Settings saved.');
     closeModal();
   };
 }
@@ -948,14 +908,15 @@ async function openWalletLookup(){
 // ---------------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------------
-document.getElementById('search').addEventListener('input', renderFeed);
-document.getElementById('sort-select').addEventListener('change', e => { state.sort = e.target.value; renderFeed(); });
-document.querySelectorAll('.chip').forEach(chip => {
-  chip.addEventListener('click', () => {
-    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
-    chip.classList.add('active');
-    state.activeFilter = chip.dataset.filter;
-    renderFeed();
+document.getElementById('search').addEventListener('input', renderTrending);
+document.querySelectorAll('.tf-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tf-tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    state.timeframe = Number(tab.dataset.tf);
+    document.getElementById('tf-label').textContent = tfLabel(state.timeframe);
+    renderTrending();
+    renderWatchlist();
   });
 });
 document.getElementById('btn-settings').addEventListener('click', openSettings);
@@ -973,8 +934,9 @@ function exportData(kind){
     const c = state.collections.get(e.contract) || {};
     return {
       time: new Date(e.time).toISOString(), collection: c.name || '', contract: e.contract,
-      standard: e.standard, quantity: e.qty, priceEth: e.priceLoaded ? ethers.formatEther(e.price) : '',
-      wallet: e.to, txHash: e.txHash, blockNumber: e.blockNumber, riskLevel: c.riskLevel || '',
+      standard: e.standard, quantity: e.qty, wallet: e.to, txHash: e.txHash,
+      blockNumber: e.blockNumber, riskLevel: c.riskLevel || '',
+      mintedLive: c.totalSupply ?? '', maxSupply: c.maxSupply ?? '',
     };
   });
   let blob, filename;
@@ -982,7 +944,7 @@ function exportData(kind){
     blob = new Blob([JSON.stringify(rows, null, 2)], {type:'application/json'});
     filename = 'mint-tape-export.json';
   } else {
-    const headers = Object.keys(rows[0]||{time:'',collection:'',contract:'',standard:'',quantity:'',priceEth:'',wallet:'',txHash:'',blockNumber:'',riskLevel:''});
+    const headers = Object.keys(rows[0]||{time:'',collection:'',contract:'',standard:'',quantity:'',wallet:'',txHash:'',blockNumber:'',riskLevel:'',mintedLive:'',maxSupply:''});
     const csv = [headers.join(',')].concat(rows.map(r => headers.map(h => `"${String(r[h]).replace(/"/g,'""')}"`).join(','))).join('\n');
     blob = new Blob([csv], {type:'text/csv'});
     filename = 'mint-tape-export.csv';
@@ -998,7 +960,6 @@ function exportData(kind){
 window.addEventListener('load', () => {
   if (typeof ethers === 'undefined'){
     setConn('err', 'ethers.js failed to load');
-    toast('Could not load the ethers.js library from the CDN — check your internet connection and reload.');
     return;
   }
   initTopics();
