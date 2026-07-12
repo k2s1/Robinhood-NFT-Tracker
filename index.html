@@ -128,6 +128,8 @@
   .tmeta{flex:1; min-width:0;}
   .tname{font-weight:600; font-size:15px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:8px;}
   .tsub{font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .tsub a.contract-link{color:var(--muted); text-decoration:none; border-bottom:1px dotted var(--muted-2);}
+  .tsub a.contract-link:hover{color:var(--amber); border-bottom-color:var(--amber);}
   .tvel{text-align:right; flex:none;}
   .tvel .n{font-family:'Barlow Condensed'; font-weight:700; font-size:24px; color:var(--teal); line-height:1;}
   .tvel .l{font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; text-transform:uppercase; margin-top:2px;}
@@ -139,6 +141,14 @@
   .badge.risk-high{color:#ff9d5c; border:1px solid #ff9d5c;}
   .badge.risk-danger{color:var(--red); border:1px solid var(--red);}
   .badge.new{color:var(--amber); border:1px solid var(--amber-dim); background:rgba(255,176,32,.08);}
+  .badge.opensea{color:#2081e2; border:1px solid #2081e2; background:rgba(32,129,226,.08); text-decoration:none;}
+  .badge.opensea:hover{background:rgba(32,129,226,.18);}
+  .os-mint-cta{
+    display:inline-flex; align-items:center; gap:6px; margin-top:14px; padding:9px 14px;
+    background:#2081e2; color:#fff; border-radius:8px; font-size:13px; font-weight:600; text-decoration:none;
+  }
+  .os-mint-cta:hover{background:#1868b8;}
+  .os-not-listed{font-size:11.5px; color:var(--muted); margin-top:14px;}
 
   /* ---------- SUPPLY BAR ---------- */
   .supply{margin-top:12px;}
@@ -293,6 +303,7 @@
 <footer>
   <span>Data source: rpc.mainnet.chain.robinhood.com + robinhoodchain.blockscout.com — no synthetic data.</span>
   <span id="footer-note">Poll mode active</span>
+  <span>Built by <a href="https://x.com/x_moazzam" target="_blank" rel="noopener">@x_moazzam</a> &amp; <a href="https://x.com/k2sbhai" target="_blank" rel="noopener">@k2sbhai</a></span>
 </footer>
 
 <div id="overlay">
@@ -320,6 +331,16 @@ const CFG = {
   windowMax: 3600_000,     // keep 1h of per-collection timestamps
   supplyRefreshMs: 25_000, // re-read totalSupply for top collections
   zeroAddr: '0x0000000000000000000000000000000000000000',
+
+  // OpenSea detection — uses OpenSea's official public REST API (v2), NOT
+  // the internal gql.opensea.io endpoint (that one is cookie-authenticated
+  // for opensea.io's own frontend and isn't for third-party use).
+  // Get a free key at https://docs.opensea.io/reference/api-keys and paste
+  // it into Settings. Without a key these calls will just fail quietly and
+  // no OpenSea badge will be shown — contract-only display, as requested.
+  openseaApiBase: 'https://api.opensea.io/api/v2',
+  openseaChainSlug: 'robinhood', // OpenSea's slug for Robinhood Chain — override in Settings if needed
+                        // OpenSea chain slugs: https://docs.opensea.io/reference/supported-chains
 };
 
 let provider = null;
@@ -337,6 +358,12 @@ const state = {
   bytecodeSeen: new Map(),  // codehash -> [addresses]
   timeframe: 900_000,       // active trending window in ms (default 15m)
   watchlist: new Set(),
+
+  // NOTE: this key is visible to anyone who views this page's source —
+  // it lives client-side. Fine for personal/local use; rotate it if this
+  // file is ever shared or hosted somewhere public.
+  openseaApiKey: '1adab4a564b543bf92d9566167685dd6',
+  openseaCache: new Map(),  // contract address -> {onOpenSea, slug, mintUrl}
 };
 
 let TOPIC_TRANSFER, TOPIC_T_SINGLE, TOPIC_T_BATCH, TOPIC_ZERO;
@@ -547,8 +574,56 @@ async function enrichCollection(rec){
     }
   }catch(e){ rec.verified = null; }
 
+  if (!isLpPositionContract(rec)) await checkOpenSea(rec);
+
   computeRisk(rec);
   renderTrending();
+}
+
+// ---------------------------------------------------------------------
+// OpenSea detection — public v2 REST API only (api.opensea.io/api/v2).
+// If a contract resolves to a real OpenSea collection, we link straight to
+// that collection's page (which surfaces the live Mint tab itself when a
+// drop is active there). If it doesn't resolve — wrong chain slug, not
+// listed, no key configured, network blocked — we just leave it alone and
+// the UI falls back to contract-only display.
+// ---------------------------------------------------------------------
+async function checkOpenSea(rec){
+  const address = rec.address;
+  if (state.openseaCache.has(address)){
+    Object.assign(rec, state.openseaCache.get(address));
+    return;
+  }
+  const result = { openseaOnOS: false, openseaSlug: null, openseaMintUrl: null };
+
+  if (!state.openseaApiKey || !CFG.openseaChainSlug){
+    // No key or no chain slug configured — skip silently, don't guess.
+    state.openseaCache.set(address, result);
+    Object.assign(rec, result);
+    return;
+  }
+
+  try{
+    const res = await fetch(
+      `${CFG.openseaApiBase}/chain/${CFG.openseaChainSlug}/contract/${address}`,
+      { headers: { 'X-API-KEY': state.openseaApiKey, 'accept': 'application/json' } }
+    );
+    if (res.ok){
+      const j = await res.json();
+      const slug = j.collection || null; // get_contract returns the collection slug
+      if (slug){
+        result.openseaOnOS = true;
+        result.openseaSlug = slug;
+        result.openseaMintUrl = `https://opensea.io/collection/${slug}`;
+      }
+    }
+    // 404 / 401 / other -> leave result as "not on OpenSea" defaults.
+  }catch(e){
+    // network/CORS error — leave as not-detected rather than assuming either way.
+  }
+
+  state.openseaCache.set(address, result);
+  Object.assign(rec, result);
 }
 
 // Periodically re-read totalSupply for the top trending collections so the
@@ -642,7 +717,21 @@ function rankedCollections(windowMs){
   return Array.from(state.collections.values())
     .map(c => { c._win = windowStats(c, windowMs); return c; })
     .filter(c => c._win.mints > 0)
+    .filter(c => !isLpPositionContract(c))
     .sort((a,b) => b._win.mints - a._win.mints);
+}
+
+// AMM liquidity-position managers (Uniswap V3/V4 "Positions NFT-V1", and
+// clones like PancakeSwap/SushiSwap that copy the same naming) mint an
+// ERC-721 every time someone opens an LP position — a real Transfer-from-
+// zero, so it trips the mint detector, but it isn't an NFT collection drop.
+// Filter these out of the trending / mint surfaces entirely.
+const LP_NAME_PATTERNS = [/positions?\s*nft/i, /liquidity\s*position/i];
+const LP_SYMBOL_PATTERNS = [/^uni-v\d-pos$/i, /^cake-v\d-pos$/i, /^lp$/i];
+function isLpPositionContract(rec){
+  const name = rec.name || '';
+  const symbol = rec.symbol || '';
+  return LP_NAME_PATTERNS.some(rx => rx.test(name)) || LP_SYMBOL_PATTERNS.some(rx => rx.test(symbol));
 }
 
 // ---------------------------------------------------------------------
@@ -705,6 +794,7 @@ function renderTrending(){
       c.verified === true ? '<span class="badge verified">verified</span>' : '',
       c.isNew ? '<span class="badge new">new</span>' : '',
       c.riskLevel && c.riskLevel !== 'unknown' ? `<span class="badge risk-${c.riskLevel}">${c.riskLevel}</span>` : '',
+      c.openseaMintUrl ? `<a class="badge opensea" href="${c.openseaMintUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()">OpenSea ↗</a>` : '',
     ].join('');
 
     return `<div class="tcard rank-${i+1}" data-contract="${c.address}">
@@ -712,7 +802,7 @@ function renderTrending(){
         <div class="trank">${i+1}</div>
         <div class="tmeta">
           <div class="tname">${escapeHtml(c.name || shortAddr(c.address))} ${badges}</div>
-          <div class="tsub">${shortAddr(c.address)} · ${c.standard} · ${win.minters} unique minter${win.minters===1?'':'s'} · last mint ${timeAgo(c.lastMintAt)}</div>
+          <div class="tsub"><a class="contract-link" href="https://robinhoodchain.blockscout.com/address/${c.address}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${shortAddr(c.address)}</a> · ${c.standard} · ${win.minters} unique minter${win.minters===1?'':'s'} · last mint ${timeAgo(c.lastMintAt)}</div>
         </div>
         <div class="tvel">
           <div class="n">${fmtNum(win.mints)}</div>
@@ -733,6 +823,7 @@ function renderActivity(){
   const el = document.getElementById('activity');
   const recent = Array.from(state.collections.values())
     .filter(c => c.lastMintAt)
+    .filter(c => !isLpPositionContract(c))
     .sort((a,b) => b.lastMintAt - a.lastMintAt)
     .slice(0, 12);
   if (recent.length === 0){
@@ -793,6 +884,10 @@ function openCollectionModal(address){
       <div style="font-size:11.5px; color:var(--muted);">Heuristic only. This is not a security audit — verify independently before minting or trading.</div>
       <div class="risk-flags">${flags || '<span class="flag">No signals yet</span>'}</div>
     </div>
+    ${coll.openseaMintUrl
+      ? `<a class="os-mint-cta" href="${coll.openseaMintUrl}" target="_blank" rel="noopener">Mint on OpenSea ↗</a>`
+      : `<div class="os-not-listed">Not detected on OpenSea${!state.openseaApiKey ? ' — add an OpenSea API key in Settings to enable detection' : ''}.</div>`
+    }
     <div class="row-inline" style="margin-top:16px;">
       <button id="btn-watch">${state.watchlist.has(address)?'★ Watching':'☆ Watch this collection'}</button>
     </div>
@@ -838,6 +933,23 @@ function openSettings(){
     <div style="font-size:11px; color:var(--muted); margin-top:6px;">
       The public endpoint is rate-limited. For production latency, use your own Alchemy, QuickNode, dRPC, Blockdaemon, or Validation Cloud endpoint for Robinhood Chain (chain id 4663) — ideally a WebSocket URL for push updates.
     </div>
+
+    <label class="small" style="margin-top:18px;">OpenSea detection (optional)</label>
+    <div class="row-inline">
+      <input type="text" id="os-key" style="flex:1;" placeholder="OpenSea API key" value="${state.openseaApiKey}">
+    </div>
+    <div class="row-inline">
+      <input type="text" id="os-chain" style="flex:1;" placeholder="OpenSea chain slug, e.g. ethereum" value="${CFG.openseaChainSlug}">
+      <button id="btn-os-save">Save</button>
+    </div>
+    <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+      Uses OpenSea's official public API (<span class="mono">api.opensea.io/api/v2</span>) to check whether a contract
+      resolves to a real OpenSea collection. Get a free key at
+      <a href="https://docs.opensea.io/reference/api-keys" target="_blank" rel="noopener">docs.opensea.io/reference/api-keys</a>.
+      This key lives only in this browser tab's memory — it is not saved to disk and is re-entered each session.
+      Chain slug must match <a href="https://docs.opensea.io/reference/supported-chains" target="_blank" rel="noopener">OpenSea's supported chain list</a>;
+      if Robinhood Chain isn't on it, detection will simply stay off and collections show contract-only, as expected.
+    </div>
   `;
   document.getElementById('overlay').classList.add('show');
   document.getElementById('modal-close').onclick = closeModal;
@@ -848,6 +960,16 @@ function openSettings(){
     if (repaintTimer) clearInterval(repaintTimer);
     if (provider && provider.destroy) try{provider.destroy();}catch(e){}
     connect(url || undefined);
+    closeModal();
+  };
+  document.getElementById('btn-os-save').onclick = () => {
+    state.openseaApiKey = document.getElementById('os-key').value.trim();
+    CFG.openseaChainSlug = document.getElementById('os-chain').value.trim();
+    state.openseaCache.clear(); // re-check everything under the new settings
+    for (const rec of state.collections.values()){
+      rec.openseaOnOS = false; rec.openseaSlug = null; rec.openseaMintUrl = null;
+      checkOpenSea(rec).then(renderTrending);
+    }
     closeModal();
   };
 }
